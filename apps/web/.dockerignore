@@ -1,0 +1,7 @@
+# Files NOT sent to the daemon when building the frontend image (context = apps/web).
+node_modules
+.next
+.env
+.env.*
+.DS_Store
+npm-debug.log*

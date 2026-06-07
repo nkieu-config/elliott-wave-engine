@@ -1,0 +1,134 @@
+[project]
+name = "engine"
+version = "0.1.0"
+description = "Elliott Wave sequential wave counter"
+# Academic / portfolio project — not open-source (see README "License").
+authors = [{ name = "Natthachak Juengrakseraochai", email = "natthachak.jeu@dome.tu.ac.th" }]
+classifiers = ["License :: Other/Proprietary License"]
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "yfinance>=0.2.40",
+    "ollama>=0.4",
+    "python-dotenv>=1.0",
+    "pyarrow>=14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+]
+# Advisory grounding check for narrations (annotates weakly-supported claims, never
+# gates text). Pulls torch (~440MB) via sentence-transformers, so kept out of core.
+# Enable with ANALYST_GROUNDING_CHECK=1; install via `uv sync --extra grounding`.
+grounding = [
+    "sentence-transformers>=3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = [
+    "-ra",                # report skip / xfail / error in summary
+    "--strict-markers",   # unknown @pytest.mark fails instead of passing
+    "--strict-config",    # unknown ini keys fail loudly
+]
+markers = [
+    # Skip with `-m "not slow"` for tight feedback loops.
+    "slow: mark test as slow (> 200ms typical wall-clock)",
+]
+
+# Branch coverage + 75% floor (current organic level — raise as coverage grows).
+[tool.coverage.run]
+branch = true
+source = ["engine", "analyst", "apps"]
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "*/.venv/*",
+    # Need the HF model at runtime — covering them downloads it on every CI run.
+    "analyst/theory/make_embeddings.py",
+    "analyst/theory/qa_calibration.py",
+]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+# Informational, not a CI gate: strict mode surfaces ~100 Literal-narrowing errors
+# (family codes carried as str through the beam). Use as a guide; ruff + tests gate CI.
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+ignore_missing_imports = true  # yfinance / ollama / sentence_transformers ship no stubs
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Beyond E/F/W/I/N/UP/B: S (security), RUF, T20 (no print in prod), SIM, PTH, TID251.
+# TID251 only (not full TID) so intra-package relative imports stay allowed.
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "RUF", "T20", "SIM", "PTH", "TID251"]
+ignore = [
+    "E501",     # line length — formatter handles intent
+    "SIM108",   # ternary often less readable than explicit if/else
+    "S101",     # assert is fine for internal invariants and tests
+    # Unicode math/typography (× ÷ ≥ ≤ ≈ → en/em-dash) is intentional; matches theory docs.
+    "RUF001", "RUF002", "RUF003",
+    "RUF022",   # __all__ grouped by category, not alphabetical
+]
+
+# Layering: domain (engine) ← application (analyst) ← interface (apps).
+# Banned globally, exempted per-layer below so only engine/** stays enforced.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"analyst".msg = "Layering violation: the engine must not import analyst (domain ← application)."
+"apps".msg = "Layering violation: engine/analyst must not import apps (apps is the top interface layer)."
+
+[tool.ruff.lint.per-file-ignores]
+# Interface layer + tests wire all layers together.
+"analyst/**" = ["TID251"]
+"apps/**" = ["TID251"]
+"tests/**" = ["TID251"]
+
+# L1..L5 = price length of wave segments (EWL theory notation, matches theory docs).
+"engine/verifiers/three.py" = ["N806"]
+"engine/verifiers/sideway.py" = ["N806"]
+"engine/verifiers/trend.py" = ["N806"]
+"tests/fixtures.py" = ["N803"]   # L1..L5 as argument names, same convention
+
+# K = statistics bandwidth/scaling factor (math convention, not lowercase).
+"engine/parser/scoring/helpers.py" = ["N803"]
+
+# CLI dev scripts: print() is the appropriate output channel.
+"analyst/theory/make_embeddings.py" = ["T201"]
+"analyst/theory/qa_calibration.py" = ["T201"]
+
+# Tests use assert / loose stubs / import-to-verify; these rules add only noise.
+"tests/*" = ["S", "SIM117", "PTH", "RUF012"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["engine*", "analyst*", "apps*"]

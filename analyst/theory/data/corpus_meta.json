@@ -1,0 +1,7 @@
+{
+  "text_sha256": "f199616a61555c909f8b35ff825b73214798c4771f7368f81b6871f2878254a9",
+  "count": 98,
+  "embed_dim": 768,
+  "model_name": "BAAI/bge-base-en-v1.5",
+  "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
+}

@@ -1,0 +1,34 @@
+# Files NOT sent to the Docker daemon when building the backend image.
+# Keeps the build context small and keeps secrets / regenerable junk out of layers.
+
+# Python build/runtime artifacts
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Frontend lives in its own image — never copy it into the backend context
+apps/web/
+
+# Secrets + local config — injected at runtime, never baked into an image
+.env
+.env.*
+
+# Regenerable data / caches (not needed at runtime; corpus under analyst/theory/data IS kept)
+data/*.parquet
+analyst/.cache/
+
+# Not needed at runtime
+tests/
+docs/
+
+# VCS / editor / OS
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store

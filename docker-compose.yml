@@ -1,0 +1,30 @@
+# Elliott Wave Lab — full stack (FastAPI backend + Next.js frontend).
+# One command to build + run everything:   docker compose up --build
+# Then open  http://localhost:3000  (API docs at http://localhost:8000/docs).
+
+services:
+  api:
+    build:
+      context: .                      # repo root — the API imports the engine packages
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"                   # host:container — reach it at localhost:8000
+    environment:
+      # Chart / score / KPI work without a key; only AI Reading + Ask need one.
+      # Picked up from your shell or the project .env if present, else empty.
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        # Inlined into the client bundle at build time → the browser calls the
+        # host-mapped backend port, not the internal compose service name.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api                           # start order only (not readiness)
+    restart: unless-stopped
