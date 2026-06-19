@@ -4,6 +4,11 @@
 
 **Rule-based wave counting you can verify, explained by an LLM that cites the theory.**
 
+**🌐 Live Demo:** [https://elliott-wave-web.vercel.app](https://elliott-wave-web.vercel.app)
+
+![Deployed on Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)
+![Backend on Render](https://img.shields.io/badge/Backend_on-Render-46E3B7?logo=render&logoColor=white)
+
 ![Python](https://img.shields.io/badge/Python-≥3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)
@@ -314,16 +319,29 @@ from the environment; see [`ollama_client.py`](analyst/client/ollama_client.py),
 
 ## Deployment & Scaling
 
+For production, this system is designed to be deployed as separated services. The current live architecture uses **Vercel** for the Next.js frontend and **Render** for the Python FastAPI backend.
+
+### 1. Frontend (Vercel)
+- **Framework Preset**: Next.js
+- **Root Directory**: `apps/web` (critical: must be set before deploying)
+- **Environment Variables**:
+  - `NEXT_PUBLIC_API_URL` = `https://<your-render-api-url>.onrender.com`
+
+### 2. Backend (Render / Docker)
+Deploy the repository root (`.`) as a Docker Web Service, pointing to `apps/api/Dockerfile`.
+- **Environment Variables**:
+  - `EWL_ENV=production` (Enforces CORS and hides OpenAPI docs)
+  - `EWL_API_CORS_ORIGINS=https://<your-vercel-frontend-url>.vercel.app`
+  - `EWL_CACHE_DIR=/app/data/.cache` (Points the caching engine to the writable volume in the Docker container)
+  - `OLLAMA_API_KEY` = `<your-key>`
+
 > [!IMPORTANT]
 > **Run one worker per process.** In-process caches aren't shared across workers, so `uvicorn --workers N`
 > causes cross-worker cache misses. To scale, use a sticky-routing reverse proxy or move caches to Redis.
 
 > [!WARNING]
-> **CORS, auth & exposure (production).** Set `EWL_API_CORS_ORIGINS` to the deployed web origin(s)
-> (otherwise a dev regex rejects public origins; `EWL_ENV=production` warns loudly). Endpoints have no
-> app-level auth and no rate limiting, and the OpenAPI docs (`/docs`, `/redoc`, `/openapi.json`) are
-> served publicly — protect everything at the network layer, and set `EWL_DISABLE_FORCE_REFRESH=1` to
-> block the cache bypass that burns LLM calls.
+> **CORS, auth & exposure (production).** Ensure `EWL_API_CORS_ORIGINS` is set correctly. Endpoints have no
+> app-level auth and no rate limiting. Set `EWL_DISABLE_FORCE_REFRESH=1` to block the cache bypass that burns LLM calls.
 
 ## License
 
