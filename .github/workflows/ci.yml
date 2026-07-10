@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   python:
-    name: Python ${{ matrix.python-version }} — ruff + pytest (cov ≥ 75%)
+    name: Python ${{ matrix.python-version }} — ruff + layers + pytest (cov ≥ 75%)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,6 +32,10 @@ jobs:
 
       - name: Lint
         run: uv run ruff check .
+
+      # Fails on any upward import across apps → infra → analyst → engine.
+      - name: Check architecture layers
+        run: uv run lint-imports
 
       # --cov applies the pyproject coverage config (branch + fail_under = 75).
       - name: Test

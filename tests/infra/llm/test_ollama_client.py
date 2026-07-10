@@ -3,7 +3,7 @@ import threading
 import httpx
 import pytest
 
-from analyst.client.ollama_client import OllamaClient
+from infra.llm.ollama_client import OllamaClient
 
 _HI = [{"role": "user", "content": "hi"}]
 

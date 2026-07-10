@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.schemas import QaCitation, QaRequest, QaResponse
 from apps.api.services import analyst_service
 from engine import Bar, Scenario
@@ -30,9 +30,9 @@ async def qa(req: QaRequest) -> QaResponse:
         bars: list[Bar] | None = None
         if req.scenario_id is not None:
             # Chart-aware: rebuild the scenario the user is looking at.
-            fetched = dependencies.fetch_bars_or_502(req)
-            result = dependencies.execute_pipeline(req, fetched)
-            _scenarios, scenario = dependencies.resolve_scenario(
+            fetched = pipeline_ops.fetch_bars_or_502(req)
+            result = pipeline_ops.execute_pipeline(req, fetched)
+            _scenarios, scenario = pipeline_ops.resolve_scenario(
                 result, req.scenario_id
             )
             bars = list(fetched)
@@ -42,7 +42,7 @@ async def qa(req: QaRequest) -> QaResponse:
                 scenario=scenario,
                 bars=bars,
                 scale_mode=req.scale_mode,
-                force_refresh=dependencies.effective_force_refresh(req.force_refresh),
+                force_refresh=pipeline_ops.effective_force_refresh(req.force_refresh),
             )
         except HTTPException:
             raise

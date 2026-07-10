@@ -3,7 +3,7 @@ name = "engine"
 version = "0.1.0"
 description = "Elliott Wave sequential wave counter"
 # Academic / portfolio project — not open-source (see README "License").
-authors = [{ name = "Natthachak Juengrakseraochai", email = "natthachak.jeu@dome.tu.ac.th" }]
+authors = [{ name = "Natthachak Jeungraksareechai", email = "natthachak.jeu@dome.tu.ac.th" }]
 classifiers = ["License :: Other/Proprietary License"]
 requires-python = ">=3.11"
 dependencies = [
@@ -21,6 +21,7 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
+    "import-linter>=2.0",
 ]
 api = [
     "fastapi>=0.115",
@@ -50,7 +51,7 @@ markers = [
 # Branch coverage + 75% floor (current organic level — raise as coverage grows).
 [tool.coverage.run]
 branch = true
-source = ["engine", "analyst", "apps"]
+source = ["engine", "analyst", "infra", "apps"]
 omit = [
     "*/__pycache__/*",
     "*/tests/*",
@@ -98,15 +99,17 @@ ignore = [
     "RUF022",   # __all__ grouped by category, not alphabetical
 ]
 
-# Layering: domain (engine) ← application (analyst) ← interface (apps).
-# Banned globally, exempted per-layer below so only engine/** stays enforced.
+# Fast local echo of the layering rule for engine/** only. `lint-imports`
+# (tool.importlinter) is the authority and enforces every direction.
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "analyst".msg = "Layering violation: the engine must not import analyst (domain ← application)."
-"apps".msg = "Layering violation: engine/analyst must not import apps (apps is the top interface layer)."
+"apps".msg = "Layering violation: engine must not import apps (apps is the top interface layer)."
+"infra".msg = "Layering violation: the engine must not import infra (it declares ports; infra implements them)."
 
 [tool.ruff.lint.per-file-ignores]
-# Interface layer + tests wire all layers together.
+# Outer layers + tests legitimately import inward; lint-imports checks direction.
 "analyst/**" = ["TID251"]
+"infra/**" = ["TID251"]
 "apps/**" = ["TID251"]
 "tests/**" = ["TID251"]
 
@@ -131,4 +134,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["engine*", "analyst*", "apps*"]
+include = ["engine*", "analyst*", "infra*", "apps*"]
+
+# The architecture, as a CI gate. `lint-imports` fails on any upward import —
+# including transitive ones, which ruff's per-module ban cannot see.
+[tool.importlinter]
+root_packages = ["engine", "analyst", "infra", "apps"]
+
+[[tool.importlinter.contracts]]
+name = "Clean architecture layers (interface → infrastructure → application → domain)"
+type = "layers"
+layers = ["apps", "infra", "analyst", "engine"]

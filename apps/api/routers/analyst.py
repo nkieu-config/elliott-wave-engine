@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.schemas import AnalystStreamRequest
 from apps.api.services import analyst_service
 from engine import Bar, Scenario
@@ -45,9 +45,9 @@ async def analyst_stream(req: AnalystStreamRequest) -> StreamingResponse:
     # Pre-flight off the event loop: failures surface as HTTP status (not mid-stream
     # `error`), and the blocking work doesn't stall the loop.
     def _preflight() -> tuple[tuple[Bar, ...], list[Scenario], Scenario, str]:
-        bars = dependencies.fetch_bars_or_502(req)
-        result = dependencies.execute_pipeline(req, bars)
-        scenarios, scenario = dependencies.resolve_scenario(result, req.scenario_id)
+        bars = pipeline_ops.fetch_bars_or_502(req)
+        result = pipeline_ops.execute_pipeline(req, bars)
+        scenarios, scenario = pipeline_ops.resolve_scenario(result, req.scenario_id)
         try:
             model_id = analyst_service.get_model_id()
         except Exception as e:
@@ -79,7 +79,7 @@ async def analyst_stream(req: AnalystStreamRequest) -> StreamingResponse:
                 analyst_mode,
                 all_scenarios=scenarios,
                 scale_mode=req.scale_mode,
-                force_refresh=dependencies.effective_force_refresh(req.force_refresh),
+                force_refresh=pipeline_ops.effective_force_refresh(req.force_refresh),
             )
             gen_ms = (time.perf_counter() - t_gen0) * 1000.0
             # Skip pacing for pre-resolved text (cache hit / fallback): the

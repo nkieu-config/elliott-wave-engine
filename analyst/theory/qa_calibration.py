@@ -51,12 +51,12 @@ OUT_OF_SCOPE: tuple[str, ...] = (
 
 def main() -> None:
     from analyst.orchestrator import (
-        _load_default_chunks_and_embeddings,
         build_analyst,
+        load_default_corpus,
     )
     from analyst.theory.embedder import Embedder
 
-    chunks, emb = _load_default_chunks_and_embeddings()
+    chunks, emb = load_default_corpus()
     r = build_analyst(
         chunks=chunks, embeddings=emb, llm_client=None, embedder=Embedder(),
     ).retriever

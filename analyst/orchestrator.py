@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import functools
 import hashlib
 import logging
-import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -494,7 +492,8 @@ def _parse_chunks_jsonl(path: Path) -> list[dict]:
     return chunks_raw
 
 
-def _load_default_chunks_and_embeddings() -> tuple[list[Chunk], np.ndarray]:
+def load_default_corpus() -> tuple[list[Chunk], np.ndarray]:
+    """Read the prebuilt RAG corpus shipped under ``analyst/theory/data/``."""
     from analyst.theory.embedder import EMBED_DIM  # plain constant — no torch import
 
     data_dir = Path(__file__).resolve().parent / "theory" / "data"
@@ -508,51 +507,6 @@ def _load_default_chunks_and_embeddings() -> tuple[list[Chunk], np.ndarray]:
             "rebuild the corpus (analyst/theory/make_embeddings.py)"
         )
     return chunks, embeddings
-
-
-@functools.lru_cache(maxsize=1)
-def get_default_analyst() -> Analyst:
-    from analyst.client.ollama_client import OllamaClient
-    chunks, embeddings = _load_default_chunks_and_embeddings()
-    # Embedder powers the soft grounding check (advisory) AND Q&A similarity
-    # (required there). It pulls torch via sentence-transformers, so default off:
-    # Layer-1 and narration are unaffected (by_pages/grounding no-op when None).
-    # Opt in with ANALYST_GROUNDING_CHECK=1 or ANALYST_QA=1 (need grounding extra).
-    embedder = None
-    if os.getenv("ANALYST_GROUNDING_CHECK") == "1" or os.getenv("ANALYST_QA") == "1":
-        from analyst.theory.embedder import Embedder  # heavy: pulls torch
-        embedder = Embedder()
-    return build_analyst(
-        chunks=chunks,
-        embeddings=embeddings,
-        embedder=embedder,
-        llm_client=OllamaClient(),
-    )
-
-
-def analyze(
-    scenario: Scenario,
-    bars: list[Bar],
-    mode: str,
-    *,
-    rag_enabled: bool = True,
-    **kwargs,
-) -> AnalysisOutput:
-    return get_default_analyst().analyze(
-        scenario, bars, mode, rag_enabled=rag_enabled, **kwargs,
-    )
-
-
-def prewarm_default_analyst() -> None:
-    # Call once at startup (e.g. FastAPI lifespan) to load heavy resources off
-    # the request path. Warms corpus + lru_cache; when grounding is enabled also
-    # loads the SentenceTransformer (10-30s the first request would otherwise pay).
-    analyst = get_default_analyst()
-    embedder = analyst.retriever.embedder
-    if embedder is not None:
-        prewarm = getattr(embedder, "prewarm", None)
-        if callable(prewarm):
-            prewarm()
 
 
 def _has_active_slots(components: dict) -> bool:

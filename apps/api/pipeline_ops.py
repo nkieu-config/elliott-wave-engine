@@ -1,25 +1,64 @@
-"""Shared request→pipeline helpers. Routers call these via the module so a single
-monkeypatch point covers every route in tests."""
+"""Shared request→pipeline helpers, and the composition root for the bar
+repository. Routers call these via the module so a single monkeypatch point
+covers every route in tests."""
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 from collections.abc import Iterable
+from pathlib import Path
 
 from fastapi import HTTPException
 
 from apps.api.schemas import PipelineRequest
 from engine import (
     Bar,
+    BarRepository,
     PipelineResult,
     Scenario,
     ScoringConfig,
-    fetch_bars,
     run_pipeline,
 )
+from infra.market_data import DEFAULT_CACHE_MAX_BYTES, ParquetCache, YFinanceSource
 
 _log = logging.getLogger(__name__)
+
+# <repo>/data for dev; EWL_CACHE_DIR overrides for installed deployments.
+_DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[2] / "data"
+
+
+def cache_dir() -> Path:
+    return Path(os.environ.get("EWL_CACHE_DIR", _DEFAULT_CACHE_DIR))
+
+
+def _cache_max_bytes() -> int:
+    # EWL_CACHE_MAX_BYTES tunes the parquet LRU budget; 0 disables eviction. A
+    # malformed value falls back to the default rather than crashing app boot.
+    raw = os.environ.get("EWL_CACHE_MAX_BYTES")
+    if raw is None:
+        return DEFAULT_CACHE_MAX_BYTES
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_CACHE_MAX_BYTES
+
+
+@functools.lru_cache(maxsize=1)
+def bar_repository() -> BarRepository:
+    return BarRepository(
+        source=YFinanceSource(),
+        cache=ParquetCache(cache_dir(), max_bytes=_cache_max_bytes()),
+    )
+
+
+def fetch_bars(
+    symbol: str,
+    timeframe: str,
+    period: str,
+) -> list[Bar]:
+    return bar_repository().fetch_bars(symbol, timeframe=timeframe, period=period)
 
 
 def disable_force_refresh() -> bool:
@@ -72,15 +111,23 @@ def fetch_bars_or_502(req: PipelineRequest) -> tuple[Bar, ...]:
 
 
 def execute_pipeline(req: PipelineRequest, bars: tuple[Bar, ...]) -> PipelineResult:
-    return run_pipeline(
-        bars=bars,
-        scale_mode=req.scale_mode,
-        atr_period=req.atr_period,
-        atr_multiplier=req.atr_multiplier,
-        atr_floor=req.atr_floor,
-        min_bars_between=req.min_bars_between,
-        scoring_config=build_scoring_config(req),
-    )
+    # Redact engine failures to a 500 at every call site (mirrors fetch_bars_or_502),
+    # so a compute crash never leaks internals nor falls to FastAPI's generic handler.
+    try:
+        return run_pipeline(
+            bars=bars,
+            scale_mode=req.scale_mode,
+            atr_period=req.atr_period,
+            atr_multiplier=req.atr_multiplier,
+            atr_floor=req.atr_floor,
+            min_bars_between=req.min_bars_between,
+            scoring_config=build_scoring_config(req),
+        )
+    except Exception as e:
+        _log.exception("run_pipeline failed for %s", req.symbol)
+        raise HTTPException(
+            status_code=500, detail="Pipeline computation failed"
+        ) from e
 
 
 def resolve_scenario(

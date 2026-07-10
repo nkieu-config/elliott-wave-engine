@@ -1,7 +1,7 @@
 """Public API. Import from here; submodule paths are internal and may move.
 
 Names resolve lazily (PEP 562) so a bare import doesn't pull
-pandas/yfinance/the parser until a symbol is used.
+the parser until a symbol is used.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ __version__ = "0.1.0"
 _LAZY: dict[str, str] = {
     "run_pipeline": "engine.pipeline",
     "PipelineResult": "engine.pipeline",
-    "fetch_bars": "engine.data",
+    "BarRepository": "engine.data",
     "ScoringConfig": "engine.parser",
     "score_intermediates": "engine.parser.scoring",
     "Scenario": "engine.parser.output",
@@ -34,7 +34,7 @@ __all__ = [
     "__version__",
     "run_pipeline",
     "PipelineResult",
-    "fetch_bars",
+    "BarRepository",
     "ScoringConfig",
     "score_intermediates",
     "Scenario",
@@ -64,7 +64,7 @@ def __dir__() -> list[str]:
 
 if TYPE_CHECKING:
     # Re-export for type checkers; mirrors _LAZY. No runtime cost.
-    from engine.data import fetch_bars
+    from engine.data import BarRepository
     from engine.parser import ScoringConfig
     from engine.parser.output import AnalysisReport, Scenario
     from engine.parser.scoring import score_intermediates

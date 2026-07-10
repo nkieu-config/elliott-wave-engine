@@ -1,49 +1,50 @@
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Sequence
 from datetime import timedelta
 
-import pandas as pd
 import pytest
 
 from engine.data.cache import CacheKey
-from engine.data.repository import BarRepository, _to_bars
+from engine.data.repository import BarRepository
+from engine.types import Bar
 
 
-def _frame(volume: list | None = None) -> pd.DataFrame:
-    idx = pd.to_datetime(["2026-01-05", "2026-01-12"])
-    data = {"Open": [10.0, 11.0], "High": [12.0, 13.0],
-            "Low": [9.0, 10.5], "Close": [11.0, 12.5]}
-    if volume is not None:
-        data["Volume"] = volume
-    return pd.DataFrame(data, index=idx)
+def _bars(volume: tuple[float, float] = (1000.0, 2000.0)) -> list[Bar]:
+    return [
+        Bar(time=dt.datetime(2026, 1, 5), open=10.0, high=12.0, low=9.0,
+            close=11.0, volume=volume[0]),
+        Bar(time=dt.datetime(2026, 1, 12), open=11.0, high=13.0, low=10.5,
+            close=12.5, volume=volume[1]),
+    ]
 
 
 class _FakeSource:
-    def __init__(self, frame: pd.DataFrame) -> None:
-        self.frame = frame
+    def __init__(self, bars: list[Bar]) -> None:
+        self.bars = bars
         self.calls: list[tuple[str, str, str]] = []
 
-    def download(self, symbol: str, *, period: str, interval: str) -> pd.DataFrame:
+    def download(self, symbol: str, *, period: str, interval: str) -> list[Bar]:
         self.calls.append((symbol, period, interval))
-        return self.frame
+        return self.bars
 
 
 class _FakeCache:
-    def __init__(self, preload: dict[CacheKey, pd.DataFrame] | None = None) -> None:
-        self.store_data: dict[CacheKey, pd.DataFrame] = dict(preload or {})
+    def __init__(self, preload: dict[CacheKey, list[Bar]] | None = None) -> None:
+        self.store_data: dict[CacheKey, list[Bar]] = dict(preload or {})
         self.loads: list[tuple[CacheKey, timedelta | None]] = []
         self.stores: list[CacheKey] = []
 
     def load(
         self, key: CacheKey, max_age: timedelta | None = None
-    ) -> pd.DataFrame | None:
+    ) -> list[Bar] | None:
         self.loads.append((key, max_age))
         return self.store_data.get(key)
 
-    def store(self, key: CacheKey, df: pd.DataFrame) -> None:
+    def store(self, key: CacheKey, bars: Sequence[Bar]) -> None:
         self.stores.append(key)
-        self.store_data[key] = df
+        self.store_data[key] = list(bars)
 
     def clear(self, symbol: str | None = None) -> int:
         before = len(self.store_data)
@@ -59,8 +60,8 @@ class _FakeCache:
 
 def test_cache_hit_skips_the_source() -> None:
     key = CacheKey("AAPL", "weekly", "max")
-    cache = _FakeCache(preload={key: _frame(volume=[1000, 2000])})
-    source = _FakeSource(_frame(volume=[0, 0]))
+    cache = _FakeCache(preload={key: _bars(volume=(1000.0, 2000.0))})
+    source = _FakeSource(_bars(volume=(0.0, 0.0)))
     repo = BarRepository(source=source, cache=cache)
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max")
@@ -72,7 +73,7 @@ def test_cache_hit_skips_the_source() -> None:
 
 def test_cache_miss_downloads_and_stores() -> None:
     cache = _FakeCache()
-    source = _FakeSource(_frame(volume=[1000, 2000]))
+    source = _FakeSource(_bars())
     repo = BarRepository(source=source, cache=cache)
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max")
@@ -84,8 +85,8 @@ def test_cache_miss_downloads_and_stores() -> None:
 
 def test_read_cache_false_skips_read_but_still_stores() -> None:
     key = CacheKey("AAPL", "weekly", "max")
-    cache = _FakeCache(preload={key: _frame(volume=[9, 9])})
-    source = _FakeSource(_frame(volume=[1000, 2000]))
+    cache = _FakeCache(preload={key: _bars(volume=(9.0, 9.0))})
+    source = _FakeSource(_bars())
     repo = BarRepository(source=source, cache=cache)
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max", read_cache=False)
@@ -98,7 +99,7 @@ def test_read_cache_false_skips_read_but_still_stores() -> None:
 
 def test_write_cache_false_downloads_without_storing() -> None:
     cache = _FakeCache(preload={})
-    source = _FakeSource(_frame(volume=[1000, 2000]))
+    source = _FakeSource(_bars())
     repo = BarRepository(source=source, cache=cache)
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max", write_cache=False)
@@ -108,9 +109,9 @@ def test_write_cache_false_downloads_without_storing() -> None:
     assert [b.volume for b in bars] == [1000.0, 2000.0]
 
 
-def test_dataframe_is_converted_to_bars_with_correct_fields() -> None:
-    cache = _FakeCache(preload={CacheKey("AAPL", "weekly", "max"): _frame(volume=[1000, 2000])})
-    repo = BarRepository(source=_FakeSource(_frame()), cache=cache)
+def test_cached_bars_are_returned_verbatim() -> None:
+    cache = _FakeCache(preload={CacheKey("AAPL", "weekly", "max"): _bars()})
+    repo = BarRepository(source=_FakeSource(_bars()), cache=cache)
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max")
 
@@ -120,63 +121,62 @@ def test_dataframe_is_converted_to_bars_with_correct_fields() -> None:
     assert first.volume == 1000.0
 
 
-def test_missing_volume_column_defaults_to_zero() -> None:
-    cache = _FakeCache(preload={CacheKey("AAPL", "weekly", "max"): _frame(volume=None)})
-    repo = BarRepository(source=_FakeSource(_frame()), cache=cache)
+def test_cache_store_failure_does_not_fail_the_fetch() -> None:
+    # A full / read-only cache volume must not sink a request that already holds
+    # freshly downloaded bars.
+    class _FailingCache(_FakeCache):
+        def store(self, key: CacheKey, bars: Sequence[Bar]) -> None:
+            raise OSError("read-only volume")
+
+    repo = BarRepository(source=_FakeSource(_bars()), cache=_FailingCache())
 
     bars = repo.fetch_bars("AAPL", timeframe="week", period="max")
 
-    assert [b.volume for b in bars] == [0.0, 0.0]
-
-
-def test_nan_volume_becomes_zero() -> None:
-    cache = _FakeCache(preload={CacheKey("AAPL", "weekly", "max"): _frame(volume=[float("nan"), 5])})
-    repo = BarRepository(source=_FakeSource(_frame()), cache=cache)
-
-    bars = repo.fetch_bars("AAPL", timeframe="week", period="max")
-
-    assert [b.volume for b in bars] == [0.0, 5.0]
+    assert len(bars) == 2
 
 
 def test_unknown_timeframe_raises() -> None:
-    repo = BarRepository(source=_FakeSource(_frame()), cache=_FakeCache())
+    repo = BarRepository(source=_FakeSource(_bars()), cache=_FakeCache())
     with pytest.raises(ValueError, match="Unknown timeframe"):
         repo.fetch_bars("AAPL", timeframe="hourly", period="max")
 
 
 def test_clear_cache_delegates_to_cache() -> None:
     key = CacheKey("AAPL", "weekly", "max")
-    cache = _FakeCache(preload={key: _frame()})
-    repo = BarRepository(source=_FakeSource(_frame()), cache=cache)
+    cache = _FakeCache(preload={key: _bars()})
+    repo = BarRepository(source=_FakeSource(_bars()), cache=cache)
 
     assert repo.clear_cache("AAPL") == 1
     assert cache.count() == 0
 
 
 @pytest.mark.parametrize(
-    ("timeframe", "expected_ttl"),
+    ("timeframe", "bar_period"),
     [
-        ("day", timedelta(hours=12)),
-        ("week", timedelta(days=30)),
-        ("month", timedelta(days=1)),
+        ("day", timedelta(days=1)),
+        ("week", timedelta(days=7)),
+        ("month", timedelta(days=30)),
     ],
 )
-def test_fetch_bars_passes_per_timeframe_ttl_to_cache(
-    timeframe: str, expected_ttl: timedelta
+def test_fetch_bars_ttl_stays_below_one_bar_period(
+    timeframe: str, bar_period: timedelta
 ) -> None:
+    # Staleness budget must sit under one bar period so a freshly-closed (or the
+    # still-forming) bar is refreshed, not served stale — guards the week/month swap.
     cache = _FakeCache()
-    repo = BarRepository(source=_FakeSource(_frame(volume=[1, 2])), cache=cache)
+    repo = BarRepository(source=_FakeSource(_bars()), cache=cache)
 
     repo.fetch_bars("AAPL", timeframe=timeframe, period="max")
 
     _key, max_age = cache.loads[0]
-    assert max_age == expected_ttl
+    assert max_age is not None
+    assert timedelta(0) < max_age < bar_period
 
 
 def test_custom_ttl_policy_overrides_the_default() -> None:
     cache = _FakeCache()
     repo = BarRepository(
-        source=_FakeSource(_frame(volume=[1, 2])),
+        source=_FakeSource(_bars()),
         cache=cache,
         ttl_policy={"week": timedelta(hours=6)},
     )
@@ -190,7 +190,7 @@ def test_custom_ttl_policy_overrides_the_default() -> None:
 def test_timeframe_absent_from_policy_disables_staleness() -> None:
     cache = _FakeCache()
     repo = BarRepository(
-        source=_FakeSource(_frame(volume=[1, 2])),
+        source=_FakeSource(_bars()),
         cache=cache,
         ttl_policy={},
     )
@@ -201,17 +201,8 @@ def test_timeframe_absent_from_policy_disables_staleness() -> None:
     assert max_age is None
 
 
-def test_to_bars_drops_nan_ohlc_rows() -> None:
-    idx = pd.to_datetime(["2026-01-05", "2026-01-12", "2026-01-19"])
-    df = pd.DataFrame(
-        {
-            "Open": [10.0, float("nan"), 12.0],
-            "High": [12.0, 13.0, 14.0],
-            "Low": [9.0, 10.5, 11.0],
-            "Close": [11.0, 12.5, 13.0],
-            "Volume": [1, 2, 3],
-        },
-        index=idx,
-    )
-    bars = _to_bars(df)
-    assert [b.close for b in bars] == [11.0, 13.0]
+def test_repository_module_does_not_import_pandas() -> None:
+    # The domain repository speaks Bars; pandas belongs to the infra adapters.
+    import engine.data.repository as repo_module
+
+    assert not hasattr(repo_module, "pd")

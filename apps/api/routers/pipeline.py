@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.schemas import Layer1Request, PipelineRequest
 from apps.api.schemas_responses import (
     EducationResponse,
@@ -35,8 +35,8 @@ def pipeline(req: PipelineRequest) -> dict[str, Any]:
         req.atr_floor,
         req.min_bars_between,
     )
-    bars = dependencies.fetch_bars_or_502(req)
-    result = dependencies.execute_pipeline(req, bars)
+    bars = pipeline_ops.fetch_bars_or_502(req)
+    result = pipeline_ops.execute_pipeline(req, bars)
 
     meta = {
         "symbol": req.symbol,
@@ -62,9 +62,9 @@ def pipeline(req: PipelineRequest) -> dict[str, Any]:
 
 @router.post("/scenario/layer1", response_model=Layer1Response)
 def scenario_layer1(req: Layer1Request) -> dict[str, Any]:
-    bars = dependencies.fetch_bars_or_502(req)
-    result = dependencies.execute_pipeline(req, bars)
-    scenarios, scenario = dependencies.resolve_scenario(result, req.scenario_id)
+    bars = pipeline_ops.fetch_bars_or_502(req)
+    result = pipeline_ops.execute_pipeline(req, bars)
+    scenarios, scenario = pipeline_ops.resolve_scenario(result, req.scenario_id)
 
     try:
         layer1 = analyst_service.compute_layer1(

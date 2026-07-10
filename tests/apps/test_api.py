@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analyst.schemas.citation import CitationRef
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.main import app
 from apps.api.schemas_responses import Layer1Response, PipelineResponse
 from apps.api.services import analyst_service
@@ -126,7 +126,7 @@ def test_pipeline_502_redacts_fetch_error_detail(monkeypatch):
     def _boom(*a, **k):
         raise RuntimeError("/internal/path/secret.parquet missing")
 
-    monkeypatch.setattr(dependencies, "fetch_bars", _boom)
+    monkeypatch.setattr(pipeline_ops, "fetch_bars", _boom)
     r = client.post("/api/v1/pipeline", json=CFG)
     assert r.status_code == 502
     detail = r.json()["detail"]
@@ -166,10 +166,10 @@ def _fake_output(*, narration="alpha beta gamma", cached=False, fell_back=False,
 @pytest.fixture
 def _mock_stream_seams(monkeypatch):
     """Stub the fetch/pipeline/resolve/analyst seams the stream pre-flight calls."""
-    monkeypatch.setattr(dependencies, "fetch_bars_or_502", lambda req: (object(),))
-    monkeypatch.setattr(dependencies, "execute_pipeline", lambda req, bars: object())
+    monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", lambda req: (object(),))
+    monkeypatch.setattr(pipeline_ops, "execute_pipeline", lambda req, bars: object())
     monkeypatch.setattr(
-        dependencies, "resolve_scenario", lambda result, sid: ([object()], object())
+        pipeline_ops, "resolve_scenario", lambda result, sid: ([object()], object())
     )
     monkeypatch.setattr(analyst_service, "get_model_id", lambda: "fake-model:1b")
 
@@ -323,7 +323,7 @@ def test_qa_empty_question_422():
 def test_qa_theory_only_no_pipeline(monkeypatch):
     monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
     # No scenario_id → must NOT touch the pipeline seams.
-    monkeypatch.setattr(dependencies, "fetch_bars_or_502", _forbidden)
+    monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", _forbidden)
     captured = {}
 
     def _answer(question, **k):
@@ -354,11 +354,11 @@ def test_qa_out_of_scope_passthrough(monkeypatch):
 
 def test_qa_scenario_aware_rebuilds_chart(monkeypatch):
     monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
-    monkeypatch.setattr(dependencies, "fetch_bars_or_502", lambda req: (object(),))
-    monkeypatch.setattr(dependencies, "execute_pipeline", lambda req, bars: object())
+    monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", lambda req: (object(),))
+    monkeypatch.setattr(pipeline_ops, "execute_pipeline", lambda req, bars: object())
     sentinel = object()
     monkeypatch.setattr(
-        dependencies, "resolve_scenario", lambda result, sid: ([sentinel], sentinel)
+        pipeline_ops, "resolve_scenario", lambda result, sid: ([sentinel], sentinel)
     )
     captured = {}
 
@@ -389,7 +389,7 @@ def test_qa_502_passthrough_from_fetch(monkeypatch):
 
     monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
     monkeypatch.setattr(
-        dependencies, "fetch_bars_or_502",
+        pipeline_ops, "fetch_bars_or_502",
         lambda req: (_ for _ in ()).throw(
             HTTPException(status_code=502, detail="fetch_bars: upstream down")
         ),

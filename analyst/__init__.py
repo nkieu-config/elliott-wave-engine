@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from analyst._fingerprint import PIPELINE_FINGERPRINT
-from analyst.client.ollama_client import OllamaClient
 from analyst.diagnostics.chart_primitives import trendline_at
 from analyst.diagnostics.education import family_education
 from analyst.diagnostics.targets import compute_targets
 from analyst.orchestrator import (
     Analyst,
-    analyze,
     build_analyst,
-    get_default_analyst,
-    prewarm_default_analyst,
+    load_default_corpus,
 )
 from analyst.schemas.analysis import AnalysisResult
 from analyst.schemas.bottleneck import BottleneckDiagnosis
@@ -23,11 +20,8 @@ from analyst.theory.embedder import Embedder
 
 __all__ = [
     "Analyst",
-    "analyze",
     "build_analyst",
-    "get_default_analyst",
-    "prewarm_default_analyst",
-    "OllamaClient",
+    "load_default_corpus",
     "Chunk",
     "Embedder",
     "PIPELINE_FINGERPRINT",

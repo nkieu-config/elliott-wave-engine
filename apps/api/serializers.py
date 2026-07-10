@@ -14,7 +14,7 @@ from analyst.schemas.decision import AlternativeBrief, DecisionSummary, PriceMov
 from analyst.schemas.succession import NextPattern, SuccessionReport
 from analyst.schemas.targets import Target, TargetSet
 from analyst.taxonomy import humanize_family_codes
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.confidence import confidence_tier
 from engine import (
     AnalysisReport,
@@ -140,7 +140,7 @@ def serialize_pipeline(
 ) -> dict[str, Any]:
     # top_scenario_layer1, when present, seeds the client's cache to skip a second roundtrip.
     scenarios = result.report.scenarios if result.report else ()
-    top = dependencies.top_scenario(scenarios)
+    top = pipeline_ops.top_scenario(scenarios)
     # "complete" requires both is_complete AND a classified pattern_kind.
     n_complete = sum(1 for s in scenarios if s.is_complete and s.pattern_kind)
     n_open = len(scenarios) - n_complete

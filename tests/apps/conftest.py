@@ -5,9 +5,9 @@ EWL_REQUIRE_BARS=1 forces a hard fail.
 `run_pipeline` memoizes in-process, so the fixture run and the TestClient's
 `/api/v1/pipeline` call share one parse → identical deterministic scenario ids.
 
-ISOLATION INVARIANT: these `scope="session"` fixtures must depend only on the
-unpatched engine functions (`fetch_bars`/`run_pipeline`), never the
-`dependencies.*` seams that test_api.py swaps out with function-scoped
+ISOLATION INVARIANT: these `scope="session"` fixtures must depend only on
+unpatched primitives (a directly-built `BarRepository` / `run_pipeline`), never the
+`pipeline_ops.*` seams that test_api.py swaps out with function-scoped
 monkeypatch — else a session fixture holds real data while a later test sees the
 stub → order-dependent failures. Keep new session fixtures engine-side, or scope
 to `module`.
@@ -19,13 +19,14 @@ import os
 
 import pytest
 
-from apps.api import dependencies
+from apps.api import pipeline_ops
 from apps.api.schemas import PipelineRequest
 from apps.api.serializers import serialize_analysis_result, serialize_pipeline
 from apps.api.services import analyst_service
-from engine.data import fetch_bars
+from engine.data import BarRepository
 from engine.parser import ScoringConfig
 from engine.pipeline import run_pipeline
+from infra.market_data import ParquetCache, YFinanceSource
 
 # Mirrors the Next.js CONFIG_DEFAULTS / the aligned API defaults.
 API_CONFIG = {"symbol": "DDOG", "period": "max", "timeframe": "week", "scale_mode": "linear"}
@@ -41,9 +42,13 @@ def _missing_data(reason: str) -> None:
 
 @pytest.fixture(scope="session")
 def bars():
+    repository = BarRepository(
+        source=YFinanceSource(),
+        cache=ParquetCache(pipeline_ops.cache_dir()),
+    )
     try:
         loaded = tuple(
-            fetch_bars(
+            repository.fetch_bars(
                 API_CONFIG["symbol"],
                 timeframe=API_CONFIG["timeframe"],
                 period=API_CONFIG["period"],
@@ -75,7 +80,7 @@ def pipeline_result(bars):
 
 @pytest.fixture(scope="session")
 def top_scenario(pipeline_result):
-    return dependencies.top_scenario(pipeline_result.report.scenarios)
+    return pipeline_ops.top_scenario(pipeline_result.report.scenarios)
 
 
 @pytest.fixture(scope="session")

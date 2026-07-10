@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("infra.llm.ollama_client")
 
 DEFAULT_CLOUD_HOST = "https://ollama.com"
 DEFAULT_LOCAL_HOST = "http://localhost:11434"

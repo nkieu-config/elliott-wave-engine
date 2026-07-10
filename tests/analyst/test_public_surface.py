@@ -15,8 +15,7 @@ def test_canonical_public_symbols_are_present() -> None:
     import analyst
 
     required = {
-        "Analyst", "analyze", "build_analyst",
-        "OllamaClient",
+        "Analyst", "build_analyst", "load_default_corpus",
         "Chunk", "Embedder", "PIPELINE_FINGERPRINT",
         "AnalysisOutput", "AnalysisResult",
         "BottleneckDiagnosis", "TargetSet",
@@ -24,6 +23,14 @@ def test_canonical_public_symbols_are_present() -> None:
     }
     missing = required - set(analyst.__all__)
     assert not missing, f"analyst.__all__ is missing required symbols: {missing}"
+
+
+def test_analyst_does_not_export_its_infrastructure_adapters() -> None:
+    # Composition belongs to apps/: analyst declares the LLMClient port and must
+    # not re-export the concrete Ollama adapter (which now lives in infra/).
+    import analyst
+
+    assert "OllamaClient" not in analyst.__all__
 
 
 def test_dashboard_uses_public_surface_only() -> None:
