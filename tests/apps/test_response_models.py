@@ -1,5 +1,6 @@
-"""Validate serializer output against the API response models off the fixtures,
-so serializer↔model drift fails without needing a full endpoint pipeline run.
+"""Round-trip the dumped payload fixtures through the response models, so a
+field that dumps to something the model would reject fails without a full
+endpoint pipeline run.
 """
 
 from __future__ import annotations

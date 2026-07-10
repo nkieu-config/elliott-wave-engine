@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -22,9 +21,11 @@ router = APIRouter(prefix="/api/v1", tags=["pipeline"])
 _log = logging.getLogger(__name__)
 
 
-# Handlers return plain serializer dicts; response_model validates that output.
-@router.post("/pipeline", response_model=PipelineResponse)
-def pipeline(req: PipelineRequest) -> dict[str, Any]:
+# Handlers return the response models the serializers construct — the wire shape
+# has one source of truth in schemas_responses, and FastAPI passes already-valid
+# instances through instead of re-parsing a dict.
+@router.post("/pipeline")
+def pipeline(req: PipelineRequest) -> PipelineResponse:
     _log.info(
         "pipeline req: %s %s %s atr=%d/%.2f/%.2f minbars=%d",
         req.symbol,
@@ -60,8 +61,8 @@ def pipeline(req: PipelineRequest) -> dict[str, Any]:
     )
 
 
-@router.post("/scenario/layer1", response_model=Layer1Response)
-def scenario_layer1(req: Layer1Request) -> dict[str, Any]:
+@router.post("/scenario/layer1")
+def scenario_layer1(req: Layer1Request) -> Layer1Response:
     bars = pipeline_ops.fetch_bars_or_502(req)
     result = pipeline_ops.execute_pipeline(req, bars)
     scenarios, scenario = pipeline_ops.resolve_scenario(result, req.scenario_id)
@@ -81,10 +82,10 @@ def scenario_layer1(req: Layer1Request) -> dict[str, Any]:
     return serialize_analysis_result(layer1)
 
 
-@router.get("/scenario/education", response_model=EducationResponse)
+@router.get("/scenario/education")
 def scenario_education(
     family: str = Query(min_length=1, max_length=32, pattern=r"^[A-Z0-9_]+$"),
-) -> dict[str, Any]:
+) -> EducationResponse:
     """Static (no LLM) education entry for a wave family."""
     edu = analyst_service.family_education(family)
     if edu is None:
@@ -92,10 +93,10 @@ def scenario_education(
             status_code=404,
             detail=f"No education entry for family {family!r}",
         )
-    return {
-        "family": family,
-        "title": edu.title,
-        "one_line": edu.one_line,
-        "rules": list(edu.rules),
-        "visual_cues": list(edu.visual_cues),
-    }
+    return EducationResponse(
+        family=family,
+        title=edu.title,
+        one_line=edu.one_line,
+        rules=list(edu.rules),
+        visual_cues=list(edu.visual_cues),
+    )

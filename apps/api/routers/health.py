@@ -11,12 +11,12 @@ from apps.api.services import analyst_service
 router = APIRouter(prefix="/api", tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "ewl-api"}
+@router.get("/health")
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", service="ewl-api")
 
 
-@router.get("/ready", response_model=ReadinessResponse)
+@router.get("/ready")
 def ready(response: Response) -> ReadinessResponse:
     """200 when the analyst is warm, else 503 (holds LB traffic). Never forces a build."""
     prewarmed = analyst_service.is_prewarmed()

@@ -94,7 +94,7 @@ def payload(pipeline_result):
         "generated_at": "1970-01-01T00:00:00+00:00",
         "config": req.model_dump(exclude={"symbol", "period", "timeframe"}),
     }
-    return serialize_pipeline(pipeline_result, meta=meta)
+    return serialize_pipeline(pipeline_result, meta=meta).model_dump(mode="json")
 
 
 @pytest.fixture(scope="session")
@@ -105,4 +105,4 @@ def layer1_payload(pipeline_result, top_scenario, bars):
         all_scenarios=list(pipeline_result.report.scenarios),
         scale_mode=API_CONFIG["scale_mode"],
     )
-    return serialize_analysis_result(layer1)
+    return serialize_analysis_result(layer1).model_dump(mode="json")

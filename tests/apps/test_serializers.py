@@ -9,6 +9,9 @@ import json
 
 import pytest
 
+from apps.api.serializers import serialize_scenario
+from tests.analyst._helpers import make_scenario
+
 PIPELINE_KEYS = {
     "meta",
     "bars",
@@ -58,6 +61,24 @@ def test_report_carries_diagnostic(payload):
     } <= set(diag)
 
 
+@pytest.mark.parametrize(
+    "total, word",
+    [(0.80, "Strong"), (0.50, "Strong"), (0.49, "Moderate"),
+     (0.25, "Moderate"), (0.24, "Low"), (0.0, "Low")],
+)
+def test_confidence_tier_wired_from_headline_total(total, word):
+    # Behavioral: the serialized tier follows score_components["total"] through the
+    # real cut-offs — a tautological "key in {low,mid,high}" would miss a mis-tier.
+    ser = serialize_scenario(make_scenario(score_components={"total": total}))
+    assert ser.confidence_tier.word == word
+
+
+def test_confidence_tier_uses_total_not_raw_score():
+    # Headline is score_components["total"], not scenario.score; a swap would mis-tier.
+    ser = serialize_scenario(make_scenario(score=0.10, score_components={"total": 0.62}))
+    assert ser.confidence_tier.word == "Strong"  # 0.62 total, not 0.10 score
+
+
 @pytest.mark.slow
 def test_top_scenario_matches_engine(payload, top_scenario):
     ser = payload["top_scenario"]
@@ -65,7 +86,10 @@ def test_top_scenario_matches_engine(payload, top_scenario):
     assert ser["id"] == top_scenario.id
     assert ser["score"] == top_scenario.score
     assert ser["score_components"] == dict(top_scenario.score_components)
-    assert ser["confidence_tier"]["key"] in {"low", "mid", "high"}
+    # Tier must match the headline against the real cut-offs (not just "some valid key").
+    headline = top_scenario.score_components.get("total", top_scenario.score)
+    expected_key = "high" if headline >= 0.50 else "mid" if headline >= 0.25 else "low"
+    assert ser["confidence_tier"]["key"] == expected_key
 
 
 @pytest.mark.slow

@@ -1,5 +1,5 @@
-"""Response models mirroring ``serializers.py``; wired as ``response_model=`` to
-validate serializer output and catch drift. Field names track ``apps/web/lib/types.ts``.
+"""The wire shape's single source of truth: ``serializers.py`` constructs these
+models and routes return them directly. Field names track ``apps/web/lib/types.ts``.
 
 Enum-ish fields are typed ``str`` not ``Literal`` so a new enum value never 500s a valid response.
 """

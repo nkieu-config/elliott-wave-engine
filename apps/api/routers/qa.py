@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1", tags=["qa"])
 _log = logging.getLogger(__name__)
 
 
-@router.post("/qa", response_model=QaResponse)
+@router.post("/qa")
 async def qa(req: QaRequest) -> QaResponse:
     # Off the event loop: the 503 check, fetch+pipeline, and answer call all block.
     def _run() -> QaResponse:

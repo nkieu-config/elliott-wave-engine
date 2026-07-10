@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from fastapi import FastAPI
@@ -32,6 +33,13 @@ def _int_env(name: str, default: int) -> int:
 
 configure_logging()
 _log = logging.getLogger(__name__)
+
+
+def _api_version() -> str:
+    try:
+        return version("engine")
+    except PackageNotFoundError:
+        return "0.0.0"
 
 # CORS: explicit allowlist via EWL_API_CORS_ORIGINS (comma-separated, exact).
 # Unset → dev regex matching localhost / RFC1918 IPs on any port (fallback ports
@@ -66,7 +74,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="EWL API",
     description="Elliott Wave Lab — pipeline + analyst HTTP API",
-    version="0.1.0",
+    version=_api_version(),
     lifespan=lifespan,
     # No app-level auth → don't publish the API schema/docs in production.
     docs_url=None if _IS_PRODUCTION else "/docs",
