@@ -21,7 +21,13 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { drawOverlays } from "@/lib/chart/draw-overlays";
-import { toUTC, toUTCNum, type LegendRole } from "@/lib/chart/helpers";
+import {
+  resolveBottleneckLeg,
+  toUTC,
+  toUTCNum,
+  type LegendRole,
+  type PerLegEntry,
+} from "@/lib/chart/helpers";
 import { gregorianLocale } from "@/lib/resolve-locale";
 import type { ChartLayerKey } from "@/lib/chart-store";
 import { isDrillable, scopeLegs } from "@/lib/scenario-format";
@@ -454,22 +460,19 @@ export function useChartOverlays({
       setBottleneckRect(null);
       return;
     }
-    const perLeg = bd.intermediates?.per_leg as
-      | Array<{ leg_idx: number; ratio: number }>
-      | undefined;
+    const perLeg = bd.intermediates?.per_leg as PerLegEntry[] | undefined;
     if (!perLeg || perLeg.length === 0) {
       setBottleneckRect(null);
       return;
     }
-    const worst = perLeg.reduce((best, e) => (e.ratio > best.ratio ? e : best), perLeg[0]);
-    const legs = selectedScenario.root.children;
-    const leg = legs[worst.leg_idx];
-    if (!leg || !leg.span_start || !leg.span_end) {
+    const worst = resolveBottleneckLeg(selectedScenario, perLeg);
+    if (!worst) {
       setBottleneckRect(null);
       return;
     }
+    const { leg, legIdx } = worst;
     const t0 = toUTC(leg.span_start.time);
-    const t1 = toUTC(leg.span_end.time);
+    const t1 = toUTC(leg.span_end!.time);
 
     const chart = chartRef.current;
     if (!chart) return;
@@ -483,7 +486,7 @@ export function useChartOverlays({
       }
       const left = Math.min(x0, x1);
       const width = Math.max(0, Math.abs(x1 - x0));
-      setBottleneckRect({ left, width, legIdx: worst.leg_idx });
+      setBottleneckRect({ left, width, legIdx });
     };
     recompute();
     const ts = chart.timeScale();

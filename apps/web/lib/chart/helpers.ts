@@ -1,6 +1,6 @@
 import type { SeriesMarker, Time, UTCTimestamp } from "lightweight-charts";
 import { gregorianLocale } from "../resolve-locale";
-import { prettyFamilyUpper } from "../scenario-format";
+import { drawableLegs, prettyFamilyUpper } from "../scenario-format";
 import type { Bar, Scenario, Wave } from "../types";
 
 // Pipeline sends tz-less ISO datetimes; force UTC so the calendar date is
@@ -45,6 +45,26 @@ export function collectLeafWaves(node: Wave, out: Wave[] = []): Wave[] {
   if (isDrawable && drawableChildren.length === 0) out.push(node);
   for (const child of node.children) collectLeafWaves(child, out);
   return out;
+}
+
+export interface PerLegEntry {
+  leg_idx: number;
+  ratio: number;
+}
+
+// The engine derives leg_idx over CLOSED legs only (open legs are dropped before
+// scoring — see engine/parser/scoring/components.py), so this must index
+// drawableLegs, not root.children: an open leg ahead of the worst one would
+// otherwise shift the band onto the wrong leg.
+export function resolveBottleneckLeg(
+  scenario: Scenario,
+  perLeg: PerLegEntry[],
+): { leg: Wave; legIdx: number } | null {
+  if (perLeg.length === 0) return null;
+  const worst = perLeg.reduce((best, e) => (e.ratio > best.ratio ? e : best), perLeg[0]);
+  const leg = drawableLegs(scenario.root)[worst.leg_idx];
+  if (!leg?.span_start || !leg.span_end) return null;
+  return { leg, legIdx: worst.leg_idx };
 }
 
 export type MarkerSpec = SeriesMarker<Time>;

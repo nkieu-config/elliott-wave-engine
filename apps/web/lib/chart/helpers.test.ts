@@ -1,8 +1,14 @@
 import type { UTCTimestamp } from "lightweight-charts";
 import { describe, expect, it } from "vitest";
-import { makePivot, makeSegment, makeWave } from "../test-support/waves";
+import { makePivot, makeScenario, makeSegment, makeWave } from "../test-support/waves";
 import type { Wave } from "../types";
-import { collectLeafWaves, dedupeByTime, fmtPrice, toUTC } from "./helpers";
+import {
+  collectLeafWaves,
+  dedupeByTime,
+  fmtPrice,
+  resolveBottleneckLeg,
+  toUTC,
+} from "./helpers";
 
 describe("toUTC", () => {
   it("forces a tz-less datetime to UTC (not local) by appending Z", () => {
@@ -82,5 +88,52 @@ describe("collectLeafWaves", () => {
 
   it("returns nothing for a non-drawable node (no segments)", () => {
     expect(collectLeafWaves(bare("s1"))).toEqual([]);
+  });
+});
+
+describe("resolveBottleneckLeg", () => {
+  // The engine builds per_leg over CLOSED legs only, so leg_idx must index the
+  // same filtered list on the client.
+  const closed = (role: string) => makeWave(role);
+  const openLeg = (role: string) => makeWave(role, { span_end: null });
+
+  it("picks the leg with the highest drawdown ratio", () => {
+    const scenario = makeScenario({
+      root: makeWave("root", { children: [closed("s1"), closed("s2"), closed("s3")] }),
+    });
+    const got = resolveBottleneckLeg(scenario, [
+      { leg_idx: 0, ratio: 0.1 },
+      { leg_idx: 2, ratio: 0.9 },
+      { leg_idx: 1, ratio: 0.5 },
+    ]);
+    expect(got?.leg.role).toBe("s3");
+    expect(got?.legIdx).toBe(2);
+  });
+
+  it("skips open legs so leg_idx lands on the leg the engine scored", () => {
+    // An open leg sits BEFORE the worst one. Indexing raw root.children would
+    // resolve leg_idx=1 to the open "link" leg and shade the wrong span.
+    const scenario = makeScenario({
+      root: makeWave("root", {
+        children: [closed("s1"), openLeg("link"), closed("s2"), closed("s3")],
+      }),
+    });
+    // Engine's closed-only list is [s1, s2, s3] → leg_idx=1 means s2.
+    expect(resolveBottleneckLeg(scenario, [{ leg_idx: 1, ratio: 0.8 }])?.leg.role).toBe("s2");
+    // Guard the premise: raw indexing would have hit the open leg.
+    expect(scenario.root.children[1].role).toBe("link");
+  });
+
+  it("skips anchor children, matching drawableLegs", () => {
+    const scenario = makeScenario({
+      root: makeWave("root", { children: [closed("anchor"), closed("s1"), closed("s2")] }),
+    });
+    expect(resolveBottleneckLeg(scenario, [{ leg_idx: 0, ratio: 0.3 }])?.leg.role).toBe("s1");
+  });
+
+  it("returns null on an empty or stale per_leg index", () => {
+    const scenario = makeScenario({ root: makeWave("root", { children: [closed("s1")] }) });
+    expect(resolveBottleneckLeg(scenario, [])).toBeNull();
+    expect(resolveBottleneckLeg(scenario, [{ leg_idx: 7, ratio: 0.9 }])).toBeNull();
   });
 });
