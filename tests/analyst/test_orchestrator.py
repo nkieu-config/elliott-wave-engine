@@ -9,12 +9,14 @@ import pytest
 from analyst._fingerprint import PIPELINE_FINGERPRINT
 from analyst.client.cache import build_cache_key
 from analyst.orchestrator import (
+    _cached_citations,
     _decode_cache_payload,
     _extract_citations,
     _parse_chunks_jsonl,
     _retrieval_pages,
     build_analyst,
 )
+from analyst.schemas.citation import CitationRef, CitationReport
 from analyst.theory.chunker import Chunk
 from tests.analyst._helpers import make_scenario
 from tests.analyst._helpers import make_uptrend_then_drop_bars as _make_bars
@@ -253,6 +255,24 @@ def test_analyze_with_stub_llm_caches_second_call(tmp_path):
     assert out2.raw_narration == _passing_json()
 
 
+def test_analyze_revised_bars_invalidate_narration_cache(tmp_path):
+    # Same scenario over REVISED bars renders a different Layer-1 data block, so the
+    # narration cache must miss and re-hit the LLM. score_components alone don't
+    # capture bars/scale_mode — the `context=layer1_md` in the cache key does. Guards
+    # that wiring: dropping it would silently serve stale narration for a re-analyzed chart.
+    llm = _StubLLM(_passing_json())
+    a = build_analyst(
+        chunks=[], embeddings=np.zeros((0, 4), dtype=np.float32),
+        llm_client=llm, cache_dir=tmp_path,
+    )
+    sc = make_scenario()
+    a.analyze(sc, bars=_make_bars(250), mode="explanation")
+    assert llm.calls == 1
+    out2 = a.analyze(sc, bars=_make_bars(280), mode="explanation")
+    assert llm.calls == 2, "revised bars must miss the cache (context in key)"
+    assert out2.cached is False
+
+
 def test_fallback_is_mode_aware(tmp_path):
     a = build_analyst(
         chunks=[], embeddings=np.zeros((0, 4), dtype=np.float32),
@@ -287,14 +307,30 @@ def test_gate_fallback_is_cached(tmp_path):
     assert out2.raw_narration is not None and "(p.999)" in out2.raw_narration
 
 
+def test_cached_citations_filters_stray_page_for_legacy_payload():
+    # Legacy payload (persisted=None): a (p.N) scraped from prose must be filtered to
+    # the allowed set so a fabricated "Sources p.500" chip can't reach the UI.
+    report = CitationReport(cited_pages={110}, allowed_pages={110})
+    cits = _cached_citations(None, "Wave 5 resistance (p.110). The end (p.500).", report)
+    assert {c.page for c in cits} == {110}
+
+
+def test_cached_citations_uses_persisted_and_ignores_prose():
+    report = CitationReport(cited_pages={110}, allowed_pages={110})
+    persisted = (CitationRef(page=110, claim_sentence="x"),)
+    cits = _cached_citations(persisted, "junk (p.500)", report)
+    assert {c.page for c in cits} == {110}
+
+
 def test_decode_cache_payload_tolerates_legacy_string(tmp_path):
-    narration, raw, fell_back, report = _decode_cache_payload(
+    narration, raw, fell_back, report, citations = _decode_cache_payload(
         "Legacy plain narration."
     )
     assert narration == "Legacy plain narration."
     assert raw is None
     assert fell_back is False
     assert report.ok
+    assert citations is None  # legacy payload carries no persisted citations
 
 
 def test_gate_repair_succeeds_on_second_attempt(tmp_path):

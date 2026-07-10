@@ -173,6 +173,42 @@ def test_theory_number_not_flagged_as_fabricated(tmp_path) -> None:
     assert not out.fell_back
 
 
+def test_theory_only_answer_flags_number_absent_from_refs(tmp_path) -> None:
+    # Theory-only Q&A (no chart) must still catch a number absent from the theory
+    # refs; before the fix the fabrication corpus was empty so any number passed.
+    chunks = [Chunk(page=1, body="A Trend linkage must exceed 200 percent of the prior leg.")]
+    embeddings = np.array([[1.0]], dtype=np.float32)
+    resp = (
+        '{"paragraphs": [[{"text": "The linkage must run beyond 137 percent '
+        'of the prior leg.", "type": "data_observation", "pages": []}]]}'
+    )
+    a = build_analyst(
+        chunks=chunks, embeddings=embeddings, llm_client=_FakeLLM(response=resp),
+        embedder=FakeEmbedder(default=[1.0]), cache_dir=tmp_path,
+    )
+    out = a.answer_question("how big is a trend linkage?")  # no scenario → theory-only
+    assert out.citation_report.fabricated_number_claims != ()
+
+
+def test_qa_revised_bars_invalidate_scenario_answer_cache(tmp_path) -> None:
+    # Same question + same scenario but REVISED bars renders a different chart block,
+    # so the Q&A cache must miss and re-hit the LLM (context=chart_md in the key).
+    resp = (
+        '{"paragraphs": [[{"text": "This wave structure is still developing and '
+        'has not yet completed its final leg.", "type": "data_observation", "pages": []}]]}'
+    )
+    llm = _FakeLLM(response=resp)
+    a = build_analyst(
+        chunks=list(_CHUNKS), embeddings=_EMB.copy(), llm_client=llm,
+        embedder=FakeEmbedder(default=[1.0, 0.0, 0.0]), cache_dir=tmp_path,
+    )
+    sc = make_scenario()
+    o1 = a.answer_question("what is this pattern doing?", scenario=sc, bars=_bars(250))
+    assert not o1.fell_back and llm.calls == 1
+    a.answer_question("what is this pattern doing?", scenario=sc, bars=_bars(280))
+    assert llm.calls == 2, "revised bars must miss the Q&A cache (context in key)"
+
+
 def test_fallback_not_cached(tmp_path) -> None:
     llm = _FakeLLM(response="{}")  # unparseable draft → gate falls back
     a = _analyst(llm, FakeEmbedder(), tmp_path)

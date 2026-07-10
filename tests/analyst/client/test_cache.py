@@ -28,6 +28,21 @@ def test_build_cache_key_differs_by_rag_flag():
     assert k_on != k_off
 
 
+def test_build_cache_key_differs_by_context():
+    # The rendered data block (Layer-1 / chart) rides in `context`, so the same
+    # scenario over revised bars (e.g. a newly-crossed confirmation trigger) must
+    # not collide on the earlier narration.
+    sc = _fake_scenario()
+    k_a = build_cache_key(sc, mode="explanation", prompt_version="v1",
+                          model_id="qwen", rag_enabled=True, context="awaiting confirmation")
+    k_b = build_cache_key(sc, mode="explanation", prompt_version="v1",
+                          model_id="qwen", rag_enabled=True, context="CONFIRMED")
+    k_a2 = build_cache_key(sc, mode="explanation", prompt_version="v1",
+                           model_id="qwen", rag_enabled=True, context="awaiting confirmation")
+    assert k_a != k_b
+    assert k_a == k_a2
+
+
 def test_build_cache_key_differs_by_temperature():
     sc = _fake_scenario()
     k_cold = build_cache_key(sc, mode="explanation", prompt_version="v1",

@@ -159,6 +159,10 @@ class Analyst:
                 scenario, bars,
                 all_scenarios=all_scenarios, scale_mode=scale_mode,
             )
+        # Rendered here (not just at line ~207) so it can seed the cache key: the
+        # prompt's data block depends on bars/scale_mode/all_scenarios, none of which
+        # are captured by the scenario's score_components alone.
+        layer1_md = serialize_scenario(scenario, layer1, mode)
 
         # Stable id keys one scenario to one cache entry; model_id fallback for stubs.
         model_id = None
@@ -172,19 +176,19 @@ class Analyst:
         cache_key = build_cache_key(
             scenario, mode=mode, prompt_version=PIPELINE_FINGERPRINT,
             model_id=model_id or "none", rag_enabled=rag_enabled,
-            temperature=temperature, seed=seed,
+            temperature=temperature, seed=seed, context=layer1_md,
         )
         cached = None if force_refresh else self.cache.get(cache_key)
         if cached is not None:
-            narration_c, raw_cached, fell_back_c, report_c = _decode_cache_payload(
-                cached
+            narration_c, raw_cached, fell_back_c, report_c, citations_c = (
+                _decode_cache_payload(cached)
             )
             # Empty narration (legacy pre-gate-length-floor entry) → miss.
             if narration_c.strip():
                 return AnalysisOutput(
                     scenario_id=scenario.id, mode=mode, layer1=layer1,
                     narration=narration_c,
-                    citations=_extract_citations(narration_c),
+                    citations=_cached_citations(citations_c, narration_c, report_c),
                     citation_report=report_c,
                     model_id=model_id, prompt_version=_PROVENANCE, cached=True,
                     fell_back=fell_back_c, raw_narration=raw_cached,
@@ -202,7 +206,6 @@ class Analyst:
             chunks = []
             theory_md = "(theory retrieval disabled for ablation)"
             allowed_pages = set()
-        layer1_md = serialize_scenario(scenario, layer1, mode)
         # Layer-1's own (p.N) citations must be in allowed_pages or echoes fail the gate.
         allowed_pages |= extract_pages(layer1_md)
         # Mode-aware so a differentiator/outlook gate failure doesn't surface bottleneck text.
@@ -236,14 +239,15 @@ class Analyst:
                 model_id=model_id, prompt_version=_PROVENANCE, cached=False,
                 fell_back=True, raw_narration=None,
             )
-        # Cache on fallback too — re-renders must not re-hit the cloud for a deterministic template.
-        self.cache.put(
-            cache_key, _encode_cache_payload(narration, raw, report, fell_back),
-        )
         citations = (
             citations_from_draft(draft)
             if draft is not None and not fell_back
             else ()
+        )
+        # Cache on fallback too — re-renders must not re-hit the cloud for a deterministic template.
+        self.cache.put(
+            cache_key,
+            _encode_cache_payload(narration, raw, report, fell_back, citations),
         )
 
         return AnalysisOutput(
@@ -380,7 +384,7 @@ class Analyst:
         # number stated as a data_observation. Bodies only: the "### p.N" headers
         # would otherwise launder a fabricated figure through a matching page number.
         theory_bodies = "\n".join(c.body for c in chunks)
-        fab_corpus = f"{chart_md}\n{theory_bodies}" if chart_md else ""
+        fab_corpus = f"{chart_md}\n{theory_bodies}" if chart_md else theory_bodies
 
         model_id = None
         if self.llm_client is not None:
@@ -391,14 +395,17 @@ class Analyst:
         seed = getattr(self.llm_client, "seed", None) if self.llm_client else None
         cache_key = _qa_cache_key(
             q, retrieved_pages, scenario, model_id or "none", temperature, seed,
+            context=chart_md or "",
         )
         cached = None if force_refresh else self.cache.get(cache_key)
         if cached is not None:
-            answer_c, _raw_c, fell_back_c, report_c = _decode_cache_payload(cached)
+            answer_c, _raw_c, fell_back_c, report_c, citations_c = (
+                _decode_cache_payload(cached)
+            )
             if answer_c.strip():
                 return QaOutput(
                     question=q, answer=answer_c,
-                    citations=_extract_citations(answer_c),
+                    citations=_cached_citations(citations_c, answer_c, report_c),
                     retrieved_pages=retrieved_pages, citation_report=report_c,
                     fell_back=fell_back_c, cached=True,
                     model_id=model_id,
@@ -430,15 +437,16 @@ class Analyst:
         # Don't cache a fallback: unlike analyze()'s deterministic template, the
         # Q&A fallback is a generic error — caching it would pin a transient LLM
         # miss as a permanent failure for that question.
-        if not fell_back:
-            self.cache.put(
-                cache_key, _encode_cache_payload(answer, raw, report, fell_back),
-            )
         citations = (
             citations_from_draft(draft)
             if draft is not None and not fell_back
             else ()
         )
+        if not fell_back:
+            self.cache.put(
+                cache_key,
+                _encode_cache_payload(answer, raw, report, fell_back, citations),
+            )
         return QaOutput(
             question=q, answer=answer, citations=citations,
             retrieved_pages=retrieved_pages, citation_report=report,
@@ -560,15 +568,19 @@ def _qa_cache_key(
     model_id: str,
     temperature: float | None,
     seed: int | None,
+    *,
+    context: str = "",
 ) -> tuple:
     # Same question on different charts must not collide, so with a scenario we
-    # reuse its content-derived hash and ride the question in `mode`.
+    # reuse its content-derived hash (widened by the chart block via `context`,
+    # since the same scenario over revised bars renders a different chart) and
+    # ride the question in `mode`.
     qhash = hashlib.sha256(question.encode()).hexdigest()[:16]
     if scenario is not None:
         return build_cache_key(
             scenario, mode=f"qa:{qhash}", prompt_version=PIPELINE_FINGERPRINT,
             model_id=model_id, rag_enabled=True,
-            temperature=temperature, seed=seed,
+            temperature=temperature, seed=seed, context=context,
         )
     return ("qa", qhash, tuple(sorted(pages)), model_id,
             PIPELINE_FINGERPRINT, temperature, seed)
@@ -583,28 +595,50 @@ def _chat_messages(system: str, user: str) -> list[dict[str, str]]:
 
 def _encode_cache_payload(
     narration: str, raw: str | None, report: CitationReport, fell_back: bool,
+    citations: tuple[CitationRef, ...],
 ) -> dict:
     return {
         "narration": narration,
         "raw": raw,
         "fell_back": fell_back,
         "report": report.to_dict(),
+        # Persist the validated citations so a cache hit returns exactly what the
+        # fresh path did, never re-scraped from prose (which admits a stray (p.N)).
+        "citations": [
+            {"page": c.page, "claim_sentence": c.claim_sentence} for c in citations
+        ],
     }
 
 
 def _decode_cache_payload(
     cached: Any,
-) -> tuple[str, str | None, bool, CitationReport]:
-    # Tolerates legacy bare-string format.
+) -> tuple[str, str | None, bool, CitationReport, tuple[CitationRef, ...] | None]:
+    # Tolerates legacy bare-string / citation-less payloads (citations=None then).
     if isinstance(cached, str):
-        return cached, None, False, CitationReport()
+        return cached, None, False, CitationReport(), None
     report = CitationReport.from_dict(cached.get("report", {}))
+    raw_cits = cached.get("citations")
+    citations = None if raw_cits is None else tuple(
+        CitationRef(page=c["page"], claim_sentence=c["claim_sentence"])
+        for c in raw_cits
+    )
     return (
         cached.get("narration", ""),
         cached.get("raw"),
         bool(cached.get("fell_back", False)),
         report,
+        citations,
     )
+
+
+def _cached_citations(
+    persisted: tuple[CitationRef, ...] | None, text: str, report: CitationReport,
+) -> tuple[CitationRef, ...]:
+    # New payloads carry the validated citations; legacy ones are re-derived from
+    # prose but filtered to the allowed set so a stray (p.N) can't surface as a chip.
+    if persisted is not None:
+        return persisted
+    return tuple(c for c in _extract_citations(text) if c.page in report.allowed_pages)
 
 
 def _extract_citations(text: str) -> tuple[CitationRef, ...]:

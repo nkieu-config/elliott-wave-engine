@@ -23,9 +23,12 @@ def build_cache_key(
     *,
     temperature: float | None = None,
     seed: int | None = None,
+    context: str = "",
 ) -> tuple:
     # Content-derived hash (§5.7) — survives parser UUID regen. Key widens only
-    # when temperature/seed supplied, so legacy entries don't collide.
+    # when temperature/seed supplied, so legacy entries don't collide. `context`
+    # folds in the rendered prompt data block (Layer-1 / chart) so bars/scale_mode
+    # changes that leave score_components untouched still invalidate the entry.
     components = sc.score_components or {}
     span_start = getattr(sc.root, "span_start", None)
     time_val = getattr(span_start, "time", None) if span_start else None
@@ -33,12 +36,14 @@ def build_cache_key(
     price_str = (
         f"{getattr(span_start, 'price', '?')}" if span_start else "?"
     )
+    context_hash = hashlib.sha256(context.encode("utf-8")).hexdigest()
     payload = (
         f"{sc.family}|"
         f"{getattr(sc, 'pattern_kind', '?')}|"
         f"{sorted(components.items())}|"
         f"{time_str}|"
-        f"{price_str}"
+        f"{price_str}|"
+        f"{context_hash}"
     )
     h = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
     base = (h, mode, prompt_version, model_id, rag_enabled)
