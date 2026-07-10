@@ -147,11 +147,6 @@ def analyze(
     )
 
 
-def qa_available() -> bool:
-    """Q&A needs the embedder (similarity search); off unless ANALYST_QA=1."""
-    return _analyst().retriever.embedder is not None
-
-
 def is_prewarmed() -> bool:
     """True if the analyst singleton is already built. Inspects the lru_cache
     without triggering a (heavy) build — safe to call from a readiness probe."""

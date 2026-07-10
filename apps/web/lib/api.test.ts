@@ -108,13 +108,16 @@ describe("askQuestion", () => {
   it("POSTs the question + config and returns the parsed body", async () => {
     const body = { question: "q?", answer: "a (p.17).", citations: [], retrieved_pages: [17] };
     fetchMock.mockResolvedValue(okJson(body));
-    const out = await askQuestion({ question: "q?", symbol: "DDOG" });
+    const out = await askQuestion({ question: "q?", chart: { symbol: "DDOG", scenario_id: "s1" } });
     expect(out).toEqual(body);
 
     const { url, init } = lastCall();
     expect(url).toContain("/api/v1/qa");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ question: "q?", symbol: "DDOG" });
+    expect(JSON.parse(init.body as string)).toEqual({
+      question: "q?",
+      chart: { symbol: "DDOG", scenario_id: "s1" },
+    });
   });
 
   it("maps a 503 (embedder off) to a thrown error", async () => {

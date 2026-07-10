@@ -97,10 +97,14 @@ export interface QaResponse {
   model_id: string | null;
 }
 
-export interface QaRequest extends PipelineConfig {
+export interface QaChartContext extends PipelineConfig {
+  scenario_id: string;
+}
+
+export interface QaRequest {
   question: string;
   // Omit for theory-only Q&A; set for chart-aware (server rebuilds the scenario).
-  scenario_id?: string;
+  chart?: QaChartContext;
   force_refresh?: boolean;
 }
 

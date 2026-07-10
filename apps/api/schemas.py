@@ -59,13 +59,19 @@ class AnalystStreamRequest(PipelineRequest):
     force_refresh: bool = Field(default=False)
 
 
-class QaRequest(PipelineRequest):
-    """scenario_id optional: when set, params reconstruct that chart for chart-aware
-    answers; when omitted, the answer is pure theory RAG and params are unused."""
+class QaChartContext(PipelineRequest):
+    """Pipeline params + scenario_id: reconstructs the chart the user is looking at."""
+
+    scenario_id: str = Field(..., description="Scenario.id from /api/pipeline response")
+
+
+class QaRequest(BaseModel):
+    """chart optional: when set, its params reconstruct that chart for chart-aware
+    answers; when omitted, the answer is pure theory RAG."""
 
     question: str = Field(..., min_length=1, max_length=500)
-    scenario_id: str | None = Field(
-        default=None, description="optional Scenario.id for chart-aware Q&A"
+    chart: QaChartContext | None = Field(
+        default=None, description="optional chart context for chart-aware Q&A"
     )
     force_refresh: bool = Field(default=False)
 

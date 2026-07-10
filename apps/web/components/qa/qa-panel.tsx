@@ -61,9 +61,11 @@ export function QaPanel({ open = true }: { open?: boolean }) {
       try {
         const res = await askQuestion(
           {
-            ...config,
             question: q,
-            scenario_id: grounded && selectedId ? selectedId : undefined,
+            chart:
+              grounded && selectedId
+                ? { ...config, scenario_id: selectedId }
+                : undefined,
           },
           ctrl.signal,
         );

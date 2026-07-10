@@ -133,6 +133,53 @@ def test_pipeline_502_redacts_fetch_error_detail(monkeypatch):
     assert "secret.parquet" not in detail and "RuntimeError" not in detail
 
 
+def test_layer1_500_redacts_compute_error(monkeypatch):
+    # A compute_layer1 failure (the LINK-scenario crash class) maps to a generic 500
+    # that doesn't leak the exception text — this failure branch previously had no test.
+    monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", lambda req: (object(),))
+    monkeypatch.setattr(pipeline_ops, "execute_pipeline", lambda req, bars: object())
+    sc = SimpleNamespace(id="s1")
+    monkeypatch.setattr(
+        pipeline_ops, "resolve_scenario", lambda result, sid: ([sc], sc)
+    )
+
+    def _boom(*a, **k):
+        raise RuntimeError("/internal/trace: 'NoneType' has no attribute 'bar_index'")
+
+    monkeypatch.setattr(analyst_service, "compute_layer1", _boom)
+    r = client.post("/api/v1/scenario/layer1", json={**CFG, "scenario_id": "s1"})
+    assert r.status_code == 500
+    detail = r.json()["detail"]
+    assert detail == "Layer-1 computation failed"
+    assert "bar_index" not in detail and "RuntimeError" not in detail
+
+
+def test_pipeline_500_redacts_engine_error(monkeypatch):
+    # execute_pipeline now wraps run_pipeline so an engine crash is a redacted 500
+    # at the /pipeline call site too (previously fell to FastAPI's generic handler).
+    monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", lambda req: (object(),))
+
+    def _boom(*a, **k):
+        raise RuntimeError("/internal/trace: beam overflow at segment 7")
+
+    monkeypatch.setattr(pipeline_ops, "run_pipeline", _boom)
+    r = client.post("/api/v1/pipeline", json=CFG)
+    assert r.status_code == 500
+    detail = r.json()["detail"]
+    assert detail == "Pipeline computation failed"
+    assert "beam overflow" not in detail and "RuntimeError" not in detail
+
+
+def test_security_headers_present_on_response():
+    # Hardening headers are wired for every response (health is unauth + cheap).
+    r = client.get("/api/health")
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["x-frame-options"] == "DENY"
+    assert r.headers["referrer-policy"] == "no-referrer"
+    # HSTS is production-only; tests run non-production.
+    assert "strict-transport-security" not in r.headers
+
+
 # ── /api/v1/analyst/stream SSE contract (seams mocked, no LLM) ──────────────────
 STREAM_REQ = {**CFG, "scenario_id": "s1", "mode": "explanation", "rate_tps": 500.0}
 
@@ -295,7 +342,8 @@ def test_pipeline_then_layer1_roundtrip(bars):  # bars fixture → skip if data 
 
 
 # ── /api/v1/qa single-shot contract (seams mocked, no embedder/LLM) ─────────────
-QA_REQ = {**CFG, "question": "What is a five-wave trend?"}
+QA_REQ = {"question": "What is a five-wave trend?"}
+QA_CHART_REQ = {**QA_REQ, "chart": {**CFG, "scenario_id": "s1"}}
 
 
 def _qa_output(**over):
@@ -309,19 +357,19 @@ def _qa_output(**over):
 
 
 def test_qa_503_when_embedder_absent(monkeypatch):
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: False)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: False)
     r = client.post("/api/v1/qa", json=QA_REQ)
     assert r.status_code == 503
     assert "ANALYST_QA" in r.json()["detail"]
 
 
 def test_qa_empty_question_422():
-    r = client.post("/api/v1/qa", json={**CFG, "question": ""})
+    r = client.post("/api/v1/qa", json={"question": ""})
     assert r.status_code == 422
 
 
 def test_qa_theory_only_no_pipeline(monkeypatch):
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: True)
     # No scenario_id → must NOT touch the pipeline seams.
     monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", _forbidden)
     captured = {}
@@ -341,7 +389,7 @@ def test_qa_theory_only_no_pipeline(monkeypatch):
 
 
 def test_qa_out_of_scope_passthrough(monkeypatch):
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: True)
     monkeypatch.setattr(
         analyst_service, "answer_question",
         lambda *a, **k: _qa_output(answer="Outside scope.", out_of_scope=True,
@@ -353,7 +401,7 @@ def test_qa_out_of_scope_passthrough(monkeypatch):
 
 
 def test_qa_scenario_aware_rebuilds_chart(monkeypatch):
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: True)
     monkeypatch.setattr(pipeline_ops, "fetch_bars_or_502", lambda req: (object(),))
     monkeypatch.setattr(pipeline_ops, "execute_pipeline", lambda req, bars: object())
     sentinel = object()
@@ -367,7 +415,7 @@ def test_qa_scenario_aware_rebuilds_chart(monkeypatch):
         return _qa_output()
 
     monkeypatch.setattr(analyst_service, "answer_question", _answer)
-    r = client.post("/api/v1/qa", json={**QA_REQ, "scenario_id": "s1"})
+    r = client.post("/api/v1/qa", json=QA_CHART_REQ)
     assert r.status_code == 200
     assert captured["scenario"] is sentinel
     assert captured["bars"] is not None
@@ -375,7 +423,7 @@ def test_qa_scenario_aware_rebuilds_chart(monkeypatch):
 
 def test_qa_500_on_unexpected_error(monkeypatch):
     # A non-HTTPException from the service maps to 500 with a generic, redacted detail.
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: True)
     monkeypatch.setattr(analyst_service, "answer_question", _boom_runtime)
     r = client.post("/api/v1/qa", json=QA_REQ)
     assert r.status_code == 500
@@ -387,7 +435,7 @@ def test_qa_502_passthrough_from_fetch(monkeypatch):
     # A 502 raised by the fetch seam must re-raise as 502, not get swallowed to 500.
     from fastapi import HTTPException
 
-    monkeypatch.setattr(analyst_service, "qa_available", lambda: True)
+    monkeypatch.setattr(analyst_service, "qa_enabled_setting", lambda: True)
     monkeypatch.setattr(
         pipeline_ops, "fetch_bars_or_502",
         lambda req: (_ for _ in ()).throw(
@@ -395,7 +443,7 @@ def test_qa_502_passthrough_from_fetch(monkeypatch):
         ),
     )
     monkeypatch.setattr(analyst_service, "answer_question", _forbidden)
-    r = client.post("/api/v1/qa", json={**QA_REQ, "scenario_id": "s1"})
+    r = client.post("/api/v1/qa", json=QA_CHART_REQ)
     assert r.status_code == 502
     assert "fetch_bars" in r.json()["detail"]
 

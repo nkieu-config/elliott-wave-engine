@@ -19,29 +19,37 @@ _log = logging.getLogger(__name__)
 
 @router.post("/qa")
 async def qa(req: QaRequest) -> QaResponse:
-    # Off the event loop: the 503 check, fetch+pipeline, and answer call all block.
+    # Cheap env check up front: rejecting a disabled deployment must not trigger
+    # the heavy analyst build just to answer 503.
+    if not analyst_service.qa_enabled_setting():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Q&A unavailable: embedder not loaded (needs ANALYST_QA=1 and "
+                "the `grounding` extra)."
+            ),
+        )
+
+    # Off the event loop: fetch+pipeline and the answer call all block.
     def _run() -> QaResponse:
-        if not analyst_service.qa_available():
-            raise HTTPException(
-                status_code=503,
-                detail="Q&A unavailable: embedder not loaded (set ANALYST_QA=1).",
-            )
         scenario: Scenario | None = None
         bars: list[Bar] | None = None
-        if req.scenario_id is not None:
+        scale_mode = "linear"
+        if req.chart is not None:
             # Chart-aware: rebuild the scenario the user is looking at.
-            fetched = pipeline_ops.fetch_bars_or_502(req)
-            result = pipeline_ops.execute_pipeline(req, fetched)
+            fetched = pipeline_ops.fetch_bars_or_502(req.chart)
+            result = pipeline_ops.execute_pipeline(req.chart, fetched)
             _scenarios, scenario = pipeline_ops.resolve_scenario(
-                result, req.scenario_id
+                result, req.chart.scenario_id
             )
             bars = list(fetched)
+            scale_mode = req.chart.scale_mode
         try:
             output = analyst_service.answer_question(
                 req.question,
                 scenario=scenario,
                 bars=bars,
-                scale_mode=req.scale_mode,
+                scale_mode=scale_mode,
                 force_refresh=pipeline_ops.effective_force_refresh(req.force_refresh),
             )
         except HTTPException:
