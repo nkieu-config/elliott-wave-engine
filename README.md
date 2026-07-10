@@ -4,20 +4,20 @@
 
 **Rule-based wave counting you can verify, explained by an LLM that cites the theory.**
 
-**🌐 Live Demo:** [https://elliott-wave-web.vercel.app](https://elliott-wave-web.vercel.app)
-
-![Deployed on Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)
-![Backend on Render](https://img.shields.io/badge/Backend_on-Render-46E3B7?logo=render&logoColor=white)
+[![CI](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml/badge.svg)](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-brightgreen?logo=vercel&logoColor=white)](https://elliott-wave-web.vercel.app)
 
 ![Python](https://img.shields.io/badge/Python-≥3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-frontend-3178C6?logo=typescript&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
 
-[![CI](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml/badge.svg)](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1%2C150%2B-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-≥75%25%20gated-brightgreen)
+[Live demo](https://elliott-wave-web.vercel.app) · [Why I built this](#why-i-built-this) · [How it works](#what-happens-when-you-analyze-one-chart) · [Quick start](#quick-start) · [Documentation](#documentation)
+
+**A full-stack Elliott Wave analysis system built solo as my computer-science senior project.** A symbolic engine counts waves with explicit, auditable rules; a deterministic diagnostics layer computes every target and risk figure; and an LLM analyst narrates the result — structurally prevented from inventing numbers or citations.
+
+**1,268 automated tests · ≈92% branch coverage · 500-wide beam search · 98-page cited theory corpus · 5 grounding gates · ~37k lines of Python + TypeScript**
 
 _Senior Project · Department of Computer Science, Thammasat University_
 
@@ -25,66 +25,44 @@ _Senior Project · Department of Computer Science, Thammasat University_
 
 ---
 
-## Demo
-
 <p align="center">
   <img src="docs/assets/dashboard.png" alt="Elliott Wave dashboard — price chart with wave overlay, ranked scenarios, and the AI reading panel" width="100%">
 </p>
+<p align="center">
+  <sub><b>Dashboard</b> — wave overlay on the price chart, ranked scenarios with score breakdowns</sub>
+</p>
 
-<table>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/assets/analyst-tab.png" alt="AI Reading panel streaming a theory-cited narration"><br>
-  <sub><b>AI Reading</b> — streamed narration, every claim cites the theory</sub>
-</td>
-<td width="50%" valign="top">
-  <img src="docs/assets/qa.png" alt="Ask — free-form Elliott Wave Q&A answered with theory citations"><br>
-  <sub><b>Ask</b> — free-form theory Q&A, answered from <code>docs/</code> with citations</sub>
-</td>
-</tr>
-</table>
+## Try it in 60 seconds
 
-## Overview
+**🔗 Live demo: [elliott-wave-web.vercel.app](https://elliott-wave-web.vercel.app)** — no signup, no key needed.
 
-Counting Elliott waves is notoriously subjective — two analysts can label the same chart differently, and
-most tools hand you a count with no way to check how they got there. This system analyzes the structure of
-stock/asset markets using **Elliott Wave Theory** on a **neuro-symbolic** architecture that makes the
-reading auditable: a rule-based (symbolic) wave counter that produces verifiable results, paired with a
-large-language-model (neuro / LLM) analyst that explains those results and cites the underlying theory for
-every statement it makes.
+1. The default chart loads with the top-ranked wave count already overlaid. **Click any wave label** to drill into its sub-waves.
+2. Open a scenario's **score breakdown** to see exactly which structural rule is its weakest link — every count comes with a per-rule pass/fail trail.
+3. Open **AI Reading** and watch four lenses (Structure / Outlook / Risk / Alternative) stream in — every claim carries a theory-page citation you can inspect.
 
-Everything surfaces through an interactive web dashboard: fetch price data → detect pivots → count waves
-and rank hypotheses (scenarios) by a confidence score → draw them over the price chart → narrate the
-reading with theory-grounded analysis, and answer free-form Elliott Wave theory questions on demand.
+> [!NOTE]
+> The demo runs on free tiers (frontend on Vercel, API on Render), so the first request after the API idles can take up to a minute to wake, and the first analysis of a not-yet-cached symbol fetches live market data before it renders. **Ask** (free-form theory Q&A) needs a ~440MB embedding model that doesn't fit the free tier — [run the stack locally](#quick-start) to try it.
 
 > [!IMPORTANT]
-> **Not financial advice.** This is an educational / research project. Wave counts are algorithmic
-> hypotheses and the AI narration is auto-generated — nothing here is investment advice or a recommendation
-> to buy or sell any asset. Markets carry risk; do your own research.
+> **Not financial advice.** This is an educational / research project. Wave counts are algorithmic hypotheses and the AI narration is auto-generated — nothing here is investment advice.
 
-## Highlights
+## Why I built this
 
-- **A symbolic engine built from scratch.** ATR-based ZigZag pivot detection → beam search over wave
-  hypotheses → rule verifiers (trend / sideway / 3-wave / link) → confidence scoring → wave-degree
-  labeling — not a wrapper around an off-the-shelf indicator.
-- **RAG-grounded LLM analyst.** Streams its reading over SSE in real time across four lenses
-  (Structure / Outlook / Risk / Alternative), each statement linked to a retrieved theory passage, plus
-  free-form Elliott Wave Q&A answered from the same corpus.
-- **Full-stack.** Python engine + FastAPI (SSE streaming) backend + Next.js 15 / React 19
-  dashboard with Lightweight Charts.
-- **Production-minded.** **1,150+ tests** (1040 Python + 155 web) with branch coverage gated at ≥75%
-  (actual ≈92%) in CI, `ruff` linting, an LRU-bounded parquet cache, response caching/failover for the
-  LLM, and documented CORS / auth / scaling considerations.
+**Elliott Wave analysis has a trust problem.** Two analysts can label the same chart with two different wave counts, and most charting tools hand you _their_ count with no way to check how they got there. I wanted to know: can wave counting be made **auditable** — something you can inspect, question, and verify — instead of something you take on faith?
 
-## Table of Contents
+**The first half of the answer is symbolic.** I built a wave-counting engine from scratch that treats Elliott Wave theory as an explicit grammar: an ATR-adaptive ZigZag detects pivots, a beam search explores hundreds of competing wave hypotheses at once, and rule verifiers check each one against the theory's actual rules. Every scenario the system ranks comes with a per-rule pass/fail trail and a score breakdown — you can always see _why_ a count scored the way it did.
 
-**Overview** &nbsp;·&nbsp; [Demo](#demo) · [Overview](#overview) · [Highlights](#highlights) · [Architecture](#architecture-at-a-glance)
+**The second half is the hard part.** Rule outputs and score components are precise but unreadable — so I added an LLM analyst to narrate them. That immediately creates a worse problem than the one I started with: an LLM that invents numbers or misquotes theory in a financial context destroys the auditability I built the engine for.
 
-**Get started** &nbsp;·&nbsp; [Quick Start (Docker)](#quick-start-docker) · [Prerequisites](#prerequisites) · [Installation](#installation) · [Configuration](#configuration) · [Running](#running) · [Usage](#usage)
+The rule I held myself to: **everything numeric is computed deterministically, and the LLM is only allowed to narrate.** That one rule drove most of the architecture below — down to a per-request JSON schema that makes citing an unretrieved theory page _structurally impossible_ rather than merely checked after the fact.
 
-**Reference** &nbsp;·&nbsp; [Directory Tree](#directory-tree) · [Testing](#testing) · [Environment Variables](#environment-variables) · [Deployment & Scaling](#deployment--scaling) · [License](#license) · [Project Info](#project-info)
+## What happens when you analyze one chart
 
-## Architecture at a Glance
+1. The frontend requests an analysis; the API pulls price bars from yfinance — or from a parquet cache whose per-timeframe TTL is set _below_ one bar period, so a still-forming bar always refreshes.
+2. The **symbolic engine** takes over: a causal ATR ZigZag finds pivots (no look-ahead — the last bar is still forming), then a beam search (width 500) grows hundreds of competing wave hypotheses over a recursive grammar — waves contain waves.
+3. **Rule verifiers** grade every hypothesis against the theory's actual rules (wave-3 never the shortest, retracement depth caps, alternation, degree proportionality), and **weakest-link scoring** ranks them: a count can't buy its way past one broken property with excellence elsewhere.
+4. A **deterministic diagnostics layer** computes every number the user will ever see — price targets, confirmation and invalidation levels, risk-reward, which scoring slot is the bottleneck. No LLM yet.
+5. Only now does the **LLM narrate** that pre-computed block, streamed over SSE across four lenses — constrained by typed claims, a per-request citation enum of only the retrieved theory pages, a verbatim-number check against step 4, and a citation gate that falls back to deterministic text rather than ship a suspect reading.
 
 ```mermaid
 flowchart LR
@@ -92,7 +70,8 @@ flowchart LR
     B --> C[Beam-search<br/>wave counter]
     C --> D[Rule verifiers<br/>+ scoring]
     D --> E[(Scenarios<br/>ranked)]
-    E --> F[LLM Analyst<br/>+ RAG + Q&A]
+    E --> L1[Layer-1<br/>deterministic diagnostics]
+    L1 --> F[LLM narration<br/>+ RAG + grounding gates]
     E --> G[Interactive<br/>dashboard]
     F --> G
 
@@ -102,20 +81,67 @@ flowchart LR
         D
     end
     subgraph Neuro core
+        L1
         F
     end
 ```
 
-| Layer                               | Technology                                    | Responsibility                                                                       |
-| ----------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Symbolic core** (`engine/`) | Python, pandas, numpy                         | Detect pivots (ZigZag/ATR) → count waves via beam search → verify rules → score      |
-| **Neuro core** (`analyst/`)         | Ollama Cloud (LLM) + RAG                      | Explain hypotheses + answer theory Q&A in plain language, citing theory from `docs/` |
-| **Backend** (`apps/api/`)           | FastAPI + uvicorn                             | REST API + SSE narration stream + theory Q&A (port 8000)                             |
-| **Frontend** (`apps/web/`)          | Next.js 15 + React 19 + Lightweight Charts v5 | Interactive dashboard (port 3000)                                                    |
+Because every number the narration mentions must appear verbatim in the deterministic layer, **the chart, the count, the confidence score, and the AI's explanation all trace back to something you can verify.**
 
-## Quick Start (Docker)
+Full deep-dive — beam-search design, scoring model, the five anti-hallucination layers, caching strategy, SSE streaming: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-The fastest way to run the whole stack — no Python, uv, or Node needed locally, only Docker:
+## Feature tour
+
+| Feature               | What it does                                                                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wave engine**       | ATR-adaptive ZigZag pivots, 500-wide beam search over a recursive wave grammar, explicit per-rule pass/fail verifiers, Gann-band degree gating                                         |
+| **Scenario explorer** | Ranked wave hypotheses with score breakdowns, weakest-link bottleneck callout, side-by-side comparison of what separates the top counts                                                |
+| **Interactive chart** | Wave overlay with click-to-drill into sub-waves, Fibonacci / confirmation / invalidation price lines, log-linear toggle, zoom preserved across re-renders                              |
+| **AI Reading**        | Four narration lenses (Structure / Outlook / Risk / Alternative) streamed in parallel over SSE, every claim cited to a theory page                                                     |
+| **Ask**               | `/`-hotkey free-form Elliott Wave Q&A over the 98-page theory corpus, with citation chips and an out-of-scope gate that refuses off-topic questions — [self-hosted only](#quick-start) |
+| **Shareable state**   | Selected scenario, drill path, compare mode, and chart layers all live in the URL — sharing a link reproduces the exact chart configuration                                            |
+| **Data layer**        | yfinance fetch with retry, parquet cache with per-timeframe TTLs and an LRU byte budget                                                                                                |
+
+<p align="center">
+  <img src="docs/assets/analyst-tab.png" alt="AI Reading panel streaming a theory-cited narration" width="100%">
+</p>
+<p align="center">
+  <sub><b>AI Reading</b> — streamed narration across four lenses, every claim cites the theory</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/qa.png" alt="Ask — free-form Elliott Wave Q&A answered with theory citations" width="100%">
+</p>
+<p align="center">
+  <sub><b>Ask</b> — free-form theory Q&A, answered from the corpus with citations</sub>
+</p>
+
+## Engineering decisions I'd defend in an interview
+
+- **The LLM is never allowed to compute** — every target, invalidation level, and risk figure comes from a deterministic diagnostics layer; the LLM only narrates that block, and five independent gates verify it did exactly that.
+- **Citing an unretrieved page is structurally impossible** — the JSON schema's citation field is generated per-request as an enum of only the pages the retriever actually supplied. The constraint acts at decode time, not as an after-the-fact check.
+- **Weakest-link scoring over weighted sums** — each hypothesis scores as the minimum of its structural and visual slots, the same way a human analyst discards a count with a single fatal flaw instead of averaging it away.
+- **Measured performance work, not guessed** — profiling found `copy.deepcopy` at 94% of beam-search wall time; targeted shallow cloning, `slots=True` dataclasses (100k+ allocations per long chart), and a hot/verbose scoring split brought long-chart analysis to interactive speed.
+- **Caching correctness treated as a feature** — content-derived LLM cache keys that survive UUID regeneration, a source+corpus fingerprint that invalidates narrations when the embedding model changes, atomic writes, and the discipline of never caching a degraded failover response.
+- **Honest streaming UX** — SSE narration paces tokens for live generations but skips the typewriter for cache hits, and reports real LLM wall time. The UI never fakes a live model.
+- **The architecture is a CI failure, not a convention** — an import-linter contract pins `apps → infra → analyst → engine`; any upward import fails CI. The inner layers declare Protocols (`BarSource`, `LLMClient`), `infra/` supplies the adapters, and pandas never crosses into the engine.
+- **Production-minded hardening** — fail-fast startup when production is configured without a CORS allowlist, a force-refresh guard against LLM-cost abuse, cloud-concurrency throttling, and automatic Ollama cloud→local failover triggered only by curated transport errors, so programming errors still surface as bugs.
+
+Each of these is expanded with the reasoning and trade-offs in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/TRADEOFFS.md](docs/TRADEOFFS.md).
+
+## Tech stack
+
+| Layer                         | Technology                                    | Responsibility                                                                    |
+| ----------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------- |
+| **Symbolic core** (`engine/`) | Python, pandas                                | Detect pivots (ZigZag/ATR) → count waves via beam search → verify rules → score   |
+| **Neuro core** (`analyst/`)   | Ollama Cloud (LLM) + RAG, numpy               | Explain scenarios + answer theory Q&A in plain language, citing the theory corpus |
+| **Backend** (`apps/api/`)     | FastAPI + uvicorn                             | REST API + SSE narration stream + theory Q&A                                      |
+| **Frontend** (`apps/web/`)    | Next.js 15 + React 19 + Lightweight Charts v5 | Interactive dashboard                                                             |
+| **Testing & CI**              | pytest, Vitest, ruff, import-linter           | 1,268 tests, coverage gate, enforced layering, dependency audits                  |
+
+## Quick start
+
+**Docker (recommended)** — the whole stack in one command:
 
 ```bash
 git clone https://github.com/nkieu-config/elliott-wave-ai-project.git
@@ -123,241 +149,82 @@ cd elliott-wave-ai-project
 docker compose up --build
 ```
 
-Then open the **dashboard at http://localhost:3000** (API docs at http://localhost:8000/docs). The
-backend builds from the repo root; the frontend is a multi-stage standalone image.
+Then open the **dashboard at http://localhost:3000** (API docs at http://localhost:8000/docs).
 
 > [!NOTE]
-> AI Reading + Ask need an Ollama Cloud key (chart / scoring / KPI work without one — see the
-> [Prerequisites note](#prerequisites)). For the container, compose reads `OLLAMA_API_KEY` from your shell
-> or the project `.env`:
+> AI Reading needs an Ollama Cloud key (chart / scoring / KPI work without one). Compose
+> reads `OLLAMA_API_KEY` from your shell or the project `.env`:
 >
 > ```bash
 > export OLLAMA_API_KEY=<your key>   # or: cp .env.example .env && edit it
 > docker compose up --build
 > ```
+>
+> **Ask** also needs the embedder — `ANALYST_QA=1` plus the `grounding` extra (pulls ~440MB of
+> torch), so it's off in the compose image. Use the local path below to try it.
 
-Prefer running without containers? Follow [Prerequisites](#prerequisites) → [Installation](#installation)
-for the local dev setup below.
-
-## Prerequisites
-
-> For the one-command container path, skip this section and see [Quick Start (Docker)](#quick-start-docker)
-> — the steps below are for running directly on your machine (local development).
-
-Install the following before you start:
-
-| Software                 | Version      | Notes                                                                                                     |
-| ------------------------ | ------------ | --------------------------------------------------------------------------------------------------------- |
-| **Python**               | ≥ 3.11       | uv manages the version and environment for you                                                            |
-| **uv**                   | ≥ 0.4        | Python package manager — see the [install guide](https://docs.astral.sh/uv/getting-started/installation/) |
-| **Node.js**              | ≥ 20         | Developed on v22; ships with npm (`package.json` engines pin ≥ 20)                                        |
-| **Internet**             | Required     | For yfinance price data + Ollama Cloud                                                                    |
-| **Ollama Cloud API key** | _(optional)_ | Needed only for the AI Analyst — [get a key](https://ollama.com/settings/keys)                            |
-
-> [!NOTE]
-> Without an Ollama Cloud API key the chart / KPI / scoring features work normally — only **AI Reading**
-> and **Ask** need an LLM (or a local [Ollama](https://ollama.com) running the fallback model, to which the
-> analyst fails over automatically). **Ask** also needs `ANALYST_QA=1` plus the `grounding` extra — see
-> [Environment Variables](#environment-variables).
-
-## Installation
+**Local (uv + npm)** — Python ≥3.11, Node ≥20:
 
 ```bash
-# 1) Clone the project
-git clone https://github.com/nkieu-config/elliott-wave-ai-project.git
-cd elliott-wave-ai-project
-
-# 2) Install Python dependencies (uv creates .venv and installs from uv.lock)
-uv sync --extra api
-
-# 3) Install frontend dependencies
-cd apps/web
-npm install
-cd ../..
+uv sync --extra api                                      # add --extra grounding to enable Ask
+cp .env.example .env                                     # add OLLAMA_API_KEY for AI features
+uv run uvicorn apps.api.main:app --reload --port 8000    # API on :8000
+cd apps/web && npm install && npm run dev                # UI on :3000
 ```
 
-## Configuration
+The full local guide — usage walkthrough, testing, environment-variable reference, directory tree: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
+
+## Testing & CI
+
+**1,268 tests** — 1,109 Python (pytest, mirroring the source structure: per-verifier, per-scoring-slot, per-diagnostic, plus parity tests that pin engine/gate/web behavior to each other) and 159 web (Vitest: chart helpers, SSE parsing, narration stream, stores). Branch coverage is **gated at ≥75% in CI (actual ≈92%)**.
 
 ```bash
-# Copy the example file, then fill in your values
-cp .env.example .env
+uv run pytest                # Python suite (add -m "not slow" for the fast subset)
+cd apps/web && npm test      # web suite
 ```
 
-Edit `.env` and add your Ollama Cloud API key:
+Every push and PR runs [CI](.github/workflows/ci.yml) across three jobs, with Actions SHA-pinned:
 
-```
-OLLAMA_API_KEY=<your key from https://ollama.com/settings/keys>
-```
+- **Python 3.11 + 3.12 matrix** — `ruff`, the import-linter architecture contract, `pytest` with the coverage gate, and a `pip-audit` vulnerability scan.
+- **Web** — `tsc`, `eslint`, **`next build`** (catches RSC/static-generation failures type checks miss), Vitest, and `npm audit`.
+- **Docker** — builds both compose images, so the README's own quick-start command breaks CI instead of a first-time user.
 
-The frontend calls `http://localhost:8000` by default, so no extra setup is needed for local
-development. To point it at a different API, create `apps/web/.env.local` (this file is git-ignored):
+On push to `main`, Vercel rebuilds the frontend and Render rebuilds the API image — a commit reaches the live demo with no manual deploy step. Topology and scaling notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-```
-NEXT_PUBLIC_API_URL=https://your-api-host
-```
+## Documentation
 
-## Running
+| Document                                        | What's inside                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)         | Deep dive: engine internals, anti-hallucination design, caching, streaming, web UI |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md)           | Local setup, usage guide, testing, environment variables, directory tree           |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)             | Vercel + Render deployment, scaling notes, security checklist                      |
+| [TRADEOFFS.md](docs/TRADEOFFS.md)               | Design tradeoffs and known limitations, and why each was accepted                  |
+| [Theory corpus](docs/elliott_wave_theory_en.md) | The Elliott Wave theory document the RAG analyst retrieves and cites from          |
 
-Open two terminals:
+## Honest limitations
 
-```bash
-# Terminal 1 — Backend (port 8000)
-uv run uvicorn apps.api.main:app --reload --port 8000
-```
+Deliberate scope choices for a portfolio-scale deployment — each with its full reasoning in [docs/TRADEOFFS.md](docs/TRADEOFFS.md):
 
-```bash
-# Terminal 2 — Frontend (port 3000)
-cd apps/web
-npm run dev
-```
+- **The LLM can never improve the count, only explain it.** Auditability was chosen over end-to-end learning: a neural counter might read ambiguous charts better, but it would forfeit the per-rule pass/fail trail that is this project's whole point.
+- **"Every claim cites theory" is a structural guarantee, not a semantic one.** No claim can cite a page that wasn't retrieved; whether the page's _content_ supports the claim is checked only by an opt-in advisory embedding pass, off in the default deployment.
+- **Single-process caches, one worker.** The parquet, LLM-response, and wave-count caches live in-process — simple and correct for the deployment's single worker. Scaling out needs Redis; the seams are already behind interfaces.
+- **yfinance is the sole data source** — unofficial and best-effort, but key-free for a demo, and hidden behind a `BarSource` Protocol so a licensed feed can replace it without touching the engine.
+- **No app-level auth or rate limiting** — the live demo bounds cost through CORS, a force-refresh guard, and caching; anything beyond a demo audience wants a rate limiter in front.
 
-Then open your browser:
+## About
 
-- **Dashboard:** http://localhost:3000
-- **API docs (Swagger UI):** http://localhost:8000/docs
+Built solo by [Natthachak (@nkieu-config)](https://github.com/nkieu-config) — engine, analyst, API, frontend, tests, CI, and deployment.
 
-## Usage
-
-1. Open http://localhost:3000 — the app loads a default view (symbol `DDOG`, weekly, max range).
-   The first load fetches live data from yfinance and caches it under `data/` automatically;
-   subsequent loads read from the cache and appear instantly.
-2. Choose a **symbol / period / timeframe** to fetch and re-analyze. Any symbol not yet cached is
-   fetched live from yfinance.
-3. The system ranks **wave-counting hypotheses (scenarios)** by a confidence score; inspect them one at a
-   time and open a scenario to see its **score breakdown** (where the confidence comes from).
-4. Toggle display layers (raw / trendline / latest) on the chart, then read the **AI Reading** panel,
-   which streams a narration in real time (with theory citations) across four lenses:
-   - **Structure** — what the current count is
-   - **Outlook** — targets and the conditions that confirm them
-   - **Risk** — the weakest link / invalidation
-   - **Alternative** — the runner-up scenarios if this count is wrong
-5. Press **`/`** or click **Ask** in the AI Reading header to ask a free-form Elliott Wave theory
-   question — answered from `docs/` with citations, optionally grounded in the selected scenario
-   (requires `ANALYST_QA=1`; see [Environment Variables](#environment-variables)).
-
-## Directory Tree
-
-```
-elliott-wave-ai-project/
-├── README.md                     # This guide
-├── pyproject.toml                # Python package definition + dependencies (managed by uv)
-├── uv.lock                       # Pinned dependency versions for reproducible installs
-├── .env.example                  # Example configuration (copy to .env and fill in)
-├── docker-compose.yml            # One-command full-stack run (api + web)
-│
-├── engine/                       # ── Symbolic core: rule-based Elliott Wave counter ──
-│   ├── pivot.py                  #    Pivot detection (ATR-based ZigZag pivots)
-│   ├── anchor.py                 #    Wave start selection (anchor)
-│   ├── adaptive.py               #    Wave pattern families (3-wave / 5-wave trend / sideway)
-│   ├── pipeline.py               #    Orchestration: pivots → anchor → wave counting
-│   ├── parser/                   #    Beam-search wave counter + scoring
-│   ├── verifiers/                #    Wave-rule checkers (trend / sideway / 3-wave / link)
-│   ├── degree/                   #    Wave degree labeling (hierarchy)
-│   └── data/                     #    Price fetch from yfinance + .parquet caching
-│
-├── analyst/                      # ── Neuro core: LLM-powered analyst ──
-│   ├── orchestrator.py           #    Main coordinator (Analyst) + default singleton factory
-│   ├── diagnostics/              #    Deterministic Layer-1: targets / bottlenecks / confirmation / decision / succession
-│   ├── client/                   #    Ollama Cloud+local client (failover) + response cache + grounding gate
-│   ├── theory/                   #    Theory retrieval (RAG): chunker / embedder / retriever from docs/
-│   ├── prompts/                  #    Prompt templates: 4 narration modes + theory Q&A + repair
-│   └── schemas/ , serialization/ #    Result schemas + LLM input serialization
-│
-├── apps/
-│   ├── api/                      # Backend: FastAPI — routers/ (pipeline, analyst, qa, health),
-│   │                             #          services/, schemas.py, serializers.py, dependencies.py
-│   │                             #          + Dockerfile (image built from repo root)
-│   └── web/                      # Frontend: Next.js 15 + React 19 (app/, components/, lib/)
-│                                 #          + Dockerfile (multi-stage standalone build)
-│
-├── data/                         # Price cache (.parquet) — created automatically from yfinance
-├── docs/                         # Elliott Wave theory document (EN), used as the RAG corpus
-└── tests/                        # pytest suite (engine / analyst / apps)
-```
-
-## Testing
-
-```bash
-# Python
-uv sync --extra api --extra dev   # install the test toolchain (first time only)
-uv run pytest -m "not slow"       # fast tests
-uv run pytest                     # full suite
-
-# Frontend
-cd apps/web
-npm test
-```
-
-> CI runs the same checks on every push/PR — `ruff` + `pytest` (branch coverage ≥ 75%) and
-> `tsc` + `eslint` + `vitest` — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
-## Environment Variables
-
-<details>
-<summary><b>⚙️ Click to expand the full variable reference</b></summary>
-
-| Variable                    | Scope   | Default                 | Description                                                                                             |
-| --------------------------- | ------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| `OLLAMA_API_KEY`            | analyst | _(required for AI)_     | Ollama Cloud API key                                                                                    |
-| `OLLAMA_PRIMARY_MODEL`      | analyst | `qwen3-next:80b-cloud`  | Primary model (cloud)                                                                                   |
-| `OLLAMA_FALLBACK_MODEL`     | analyst | `qwen3.5:9b`            | Fallback model (local Ollama), used if the cloud call fails                                             |
-| `ANALYST_QA`                | analyst | _(off)_                 | Set to `1` to enable the **Ask** theory Q&A (embedding retrieval; requires `uv sync --extra api --extra grounding`) |
-| `ANALYST_GROUNDING_CHECK`   | analyst | _(off)_                 | Set to `1` to enable the grounding check (requires `uv sync --extra api --extra grounding`, pulls ~440MB torch)     |
-| `EWL_API_CORS_ORIGINS`      | api     | _(dev regex)_           | Comma-separated allowlist of origins for production                                                     |
-| `EWL_ENV`                   | api     | _(unset)_               | Set to `production` to warn loudly when `EWL_API_CORS_ORIGINS` is missing                               |
-| `EWL_DISABLE_FORCE_REFRESH` | api     | _(off)_                 | Set to `1` to disable force-refresh (prevents cache bypass that burns LLM calls on public deploys)      |
-| `EWL_CACHE_DIR`             | engine  | `<repo>/data`           | Directory for the price parquet cache                                                                   |
-| `EWL_CACHE_MAX_BYTES`       | engine  | `268435456` (256MB)     | LRU budget for the parquet cache; over budget evicts oldest-fetched files first; `0` disables eviction  |
-| `NEXT_PUBLIC_API_URL`       | web     | `http://localhost:8000` | API address the frontend calls                                                                          |
-
-Normally only `OLLAMA_API_KEY` (and `EWL_API_CORS_ORIGINS` when deploying) need setting; the rest have
-working defaults. Finer knobs — Ollama timeouts / retries / concurrency, logging, Sentry DSNs — also read
-from the environment; see [`ollama_client.py`](analyst/client/ollama_client.py),
-[`logging_config.py`](engine/logging_config.py), and `apps/web/sentry.*.config.ts`.
-
-</details>
-
-## Deployment & Scaling
-
-For production, this system is designed to be deployed as separated services. The current live architecture uses **Vercel** for the Next.js frontend and **Render** for the Python FastAPI backend.
-
-### 1. Frontend (Vercel)
-- **Framework Preset**: Next.js
-- **Root Directory**: `apps/web` (critical: must be set before deploying)
-- **Environment Variables**:
-  - `NEXT_PUBLIC_API_URL` = `https://<your-render-api-url>.onrender.com`
-
-### 2. Backend (Render / Docker)
-Deploy the repository root (`.`) as a Docker Web Service, pointing to `apps/api/Dockerfile`.
-- **Environment Variables**:
-  - `EWL_ENV=production` (Enforces CORS and hides OpenAPI docs)
-  - `EWL_API_CORS_ORIGINS=https://<your-vercel-frontend-url>.vercel.app`
-  - `EWL_CACHE_DIR=/app/data/.cache` (Points the caching engine to the writable volume in the Docker container)
-  - `OLLAMA_API_KEY` = `<your-key>`
-
-> [!IMPORTANT]
-> **Run one worker per process.** In-process caches aren't shared across workers, so `uvicorn --workers N`
-> causes cross-worker cache misses. To scale, use a sticky-routing reverse proxy or move caches to Redis.
-
-> [!WARNING]
-> **CORS, auth & exposure (production).** Ensure `EWL_API_CORS_ORIGINS` is set correctly. Endpoints have no
-> app-level auth and no rate limiting. Set `EWL_DISABLE_FORCE_REFRESH=1` to block the cache bypass that burns LLM calls.
-
-## License
-
-© 2026 Natthachak Juengrakseraochai. All rights reserved.
-
-Published as an academic / portfolio project — you're welcome to read and learn from the code, but it is
-not licensed for redistribution or commercial use without permission.
-
-## Project Info
-
-|                  |                                                                                       |
+| Project info     |                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------- |
 | **Project Code** | 68-1_24_pps-r1                                                                        |
 | **Title (TH)**   | ระบบปัญญาประดิษฐ์แบบนิวโร-ซิมบอลิกเพื่อการวิเคราะห์โครงสร้างตลาดตามทฤษฎีคลื่นเอลเลียต |
 | **Title (EN)**   | A Neuro-Symbolic AI System for Market Structure Analysis Based on Elliott Wave Theory |
-| **Author**       | Mr. Natthachak Juengrakseraochai                                                      |
+| **Author**       | Mr. Natthachak Jeungraksareechai                                                      |
 | **Advisor**      | Asst. Prof. Dr. Pokpong Songmuang                                                     |
 
 Developed as a final project for the Department of Computer Science, Thammasat University.
+
+## License
+
+© 2026 Natthachak Jeungraksareechai — all rights reserved. See [LICENSE](LICENSE).
