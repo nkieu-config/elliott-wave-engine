@@ -47,11 +47,19 @@ _parse_cache_lock = threading.Lock()
 _MISS = object()
 
 
+def _bars_digest(bars: Sequence[Bar]) -> int:
+    # count_waves scores read bar OHLC (visual sharpness/smoothness), so identical
+    # pivots over revised bar contents must miss the cache — same-index/same-price
+    # pivots aren't a sufficient fingerprint of the bars.
+    return hash(tuple((b.open, b.high, b.low, b.close) for b in bars))
+
+
 def _count_waves_cached(
     *,
     anchor_id: tuple,
     active_pivot_ids: tuple[tuple, ...],
     bars_len: int,
+    bars_digest: int,
     scale_mode: ScaleMode,
     atr_period: int,
     atr_multiplier: float,
@@ -68,6 +76,7 @@ def _count_waves_cached(
         anchor_id,
         active_pivot_ids,
         bars_len,
+        bars_digest,
         scale_mode,
         atr_period,
         atr_multiplier,
@@ -79,8 +88,11 @@ def _count_waves_cached(
         cached = _parse_cache.get(key, _MISS)
         if cached is not _MISS:
             _parse_cache.move_to_end(key)
-            # Copy so a caller mutating a Scenario/report can't poison the cache.
-            return copy.deepcopy(cached)
+    if cached is not _MISS:
+        # Copy so a caller mutating a Scenario/report can't poison the cache — done
+        # outside the lock so concurrent hits don't serialize on the deepcopy; the
+        # cached original is never handed out or mutated, so reading it unlocked is safe.
+        return copy.deepcopy(cached)
 
     # Compute outside the lock so distinct parses don't serialize on each other.
     segments = pivots_to_segments(_active_pivots, _anchor)
@@ -129,6 +141,7 @@ def _invoke_count_waves(
             (p.bar_index, round(p.price, 6), p.kind) for p in active_pivots
         ),
         bars_len=len(bars),
+        bars_digest=_bars_digest(bars),
         scale_mode=scale_mode,
         atr_period=int(atr_period),
         atr_multiplier=round(atr_multiplier, 2),
