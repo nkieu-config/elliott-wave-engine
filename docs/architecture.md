@@ -3,10 +3,11 @@
 How the system works under the hood — the symbolic wave-counting engine, the LLM analyst and its
 anti-hallucination defenses, the API layer, and the web dashboard.
 
-> Looking for setup instructions instead? See [DEVELOPMENT.md](DEVELOPMENT.md).
+> Looking for setup instructions instead? See [development.md](development.md).
 
 ## Contents
 
+- [Where to start reading](#where-to-start-reading)
 - [System overview](#system-overview)
 - [Symbolic core (`engine/`)](#symbolic-core-engine)
 - [Neuro core (`analyst/`)](#neuro-core-analyst)
@@ -16,6 +17,36 @@ anti-hallucination defenses, the API layer, and the web dashboard.
 - [Frontend (`apps/web/`)](#frontend-appsweb)
 - [Performance engineering](#performance-engineering)
 - [Testing & architecture discipline](#testing--architecture-discipline)
+
+## Where to start reading
+
+If you'd rather read the code than a description of it, these eight files are the ones worth your
+time — in an order where each builds on the last, and with what to look for once you're there.
+
+1. **[`engine/pipeline.py`](../engine/pipeline.py)** — the whole system on one page. The count
+   cache keys on pivot identity *plus a digest of the bar OHLC data*, so revised price data can
+   never serve a stale count.
+2. **[`engine/pivot.py`](../engine/pivot.py)** — a causal ATR ZigZag: `ATR[i]` uses only bars
+   `0..i`, because the last bar of a live chart is still forming. The interest is in how
+   explicitly each edge case is handled.
+3. **[`engine/parser/engine/branching.py`](../engine/parser/engine/branching.py)** — each
+   hypothesis branches exactly three ways per segment (extend / open a sub-wave / close into the
+   parent). The recursive wave grammar falls out of those three options.
+4. **[`analyst/schemas/narration.py`](../analyst/schemas/narration.py)** — the central trick.
+   The retrieved theory pages are baked into an `enum` on the citation field *per request*, so
+   citing a page the retriever never supplied is impossible at decode time, not merely detected
+   afterwards.
+5. **[`analyst/client/grounding.py`](../analyst/client/grounding.py)** — the two checks the
+   schema can't express: fabricated numbers (matched on digit boundaries, so a real `3450` does
+   not excuse an invented `450`) and leaked identifiers.
+6. **[`infra/llm/ollama_client.py`](../infra/llm/ollama_client.py)** — cloud-primary with local
+   failover. Note that response parsing sits *outside* the failover try-block: a malformed-but-200
+   response surfaces as a bug instead of being absorbed by the fallback.
+7. **[`apps/api/routers/analyst.py`](../apps/api/routers/analyst.py)** — SSE streaming that
+   refuses to fake liveness. Typewriter pacing is skipped entirely for cache hits and fallbacks.
+8. **[`tests/apps/test_web_parity.py`](../tests/apps/test_web_parity.py)** — ~50 lines that pin
+   the frontend's TypeScript defaults key-for-key to the backend's Pydantic model, so web/API
+   drift fails CI instead of shipping.
 
 ## System overview
 
@@ -148,13 +179,24 @@ involved:
 
 ### Layer-2 — RAG-grounded narration
 
-Four narration modes (Structure / Risk / Differentiator / Outlook), each a distinct prompt over
-the same Layer-1 block, streamed to the UI in parallel.
+Four narration lenses, each a distinct prompt over the same Layer-1 block, streamed to the UI in
+parallel. The UI label, the wire `mode`, and the prompt module are three different names for the
+same lens:
+
+| UI lens         | Wire `mode`      | Prompt module                  | Answers                      |
+| --------------- | ---------------- | ------------------------------ | ---------------------------- |
+| **Structure**   | `explanation`    | `prompts/explanation.py`       | What am I looking at?        |
+| **Outlook**     | `outlook`        | `prompts/scenario_outlook.py`  | Where could it go?           |
+| **Risk**        | `risk`           | `prompts/slot_focus.py`        | What's the weakest link?     |
+| **Alternative** | `differentiator` | `prompts/differentiator.py`    | What if this count is wrong? |
 
 Retrieval ([`analyst/theory/`](../analyst/theory/)):
 
-- **Corpus** — the theory document in [`docs/elliott_wave_theory_en.md`](elliott_wave_theory_en.md),
-  chunked one-per-page (98 pages).
+- **Corpus** — the theory document in
+  [`analyst/theory/corpus/`](../analyst/theory/corpus/elliott_wave_theory_en.md), chunked
+  one-per-page (98 pages). It lives beside the code that reads it: `make_embeddings.py` turns it
+  into the prebuilt index in `analyst/theory/data/`, which is what ships and what the retriever
+  loads at runtime.
 - **Embedder** — `BAAI/bge-base-en-v1.5` (768-dim), with the HuggingFace revision **pinned to a
   SHA** so a silent upstream force-push can't shift the embedding space under the prebuilt index.
 - **Two retrieval modes** — narration uses a deterministic slot→page map (each prompt mode gets
@@ -171,8 +213,10 @@ Retrieval ([`analyst/theory/`](../analyst/theory/)):
 The `LLMClient` port lives here ([`analyst/client/base.py`](../analyst/client/base.py)); its
 adapter lives in [`infra/llm/ollama_client.py`](../infra/llm/ollama_client.py), which supplies:
 
-- Cloud primary (`qwen3-next:80b-cloud`) → automatic failover to a local Ollama fallback. Only a
+- A cloud primary model → automatic failover to a local Ollama fallback. Only a
   curated set of transport/API exceptions triggers failover — programming errors surface as bugs.
+  Both models are overridable per deployment; the current defaults are listed in the
+  [environment-variable reference](development.md#environment-variables).
 - A `BoundedSemaphore` serializes concurrent cloud calls (four narration modes firing at once
   reliably drew 429s from the cloud endpoint).
 - Bounded timeouts (the client library's default of `None` freezes the UI), exponential-backoff
@@ -270,6 +314,17 @@ Next.js 15 / React 19, Lightweight Charts v5.
 
 ## Performance engineering
 
+Where it lands today (Apple M4, cached bars, `BEAM_WIDTH = 500`, defaults elsewhere):
+
+| Chart                            | Bars  | Active pivots | Cold analysis | Memoized repeat |
+| -------------------------------- | ----- | ------------- | ------------- | --------------- |
+| AAPL weekly / max (back to 1980) | 2,379 | 94            | ~3.1s         | ~2ms            |
+| DDOG weekly / max (demo default) | 356   | 12            | ~0.5s         | ~2ms            |
+| AAPL daily / 2y                  | 501   | 13            | ~0.2s         | ~4ms            |
+
+The repeat column is the wave-count LRU (keyed on pivot identity + config) — re-analysis without a
+data change never re-runs the beam.
+
 Documented, measured optimizations on the beam-search hot path:
 
 - `copy.deepcopy` in hypothesis cloning measured at **94% of wall time** — replaced with targeted
@@ -283,13 +338,14 @@ Documented, measured optimizations on the beam-search hot path:
 
 ## Testing & architecture discipline
 
-- **Python** — ~1,095 tests mirroring the source structure (per-verifier, per-slot,
+- **Python** — a pytest suite mirroring the source structure (per-verifier, per-slot,
   per-diagnostic), plus parity tests that pin engine/gate/web behavior to each other. Branch
-  coverage gated at ≥75% in CI (actual ≈92%).
-- **Web** — 155+ Vitest cases (chart helpers, SSE parsing, narration stream, stores) plus a
-  dedicated render-profiling config for the reading pane.
+  coverage gated at ≥75% in CI; current counts and coverage live in the
+  [README](../README.md#testing--quality).
+- **Web** — Vitest cases covering chart helpers, SSE parsing, the narration stream, and stores,
+  plus a dedicated render-profiling config for the reading pane.
 - **CI** ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) — Python 3.11 + 3.12 matrix,
-  `ruff`, `lint-imports`, `pytest --cov` with the coverage gate, `tsc`, `eslint`,
+  `ruff`, `mypy`, `lint-imports`, `pytest --cov` with the coverage gate, `tsc`, `eslint`,
   **`next build`** (catches RSC/static-generation failures that type checks miss), Vitest.
   Actions SHA-pinned.
 - **Enforced layering** — [`import-linter`](https://import-linter.readthedocs.io) makes the
