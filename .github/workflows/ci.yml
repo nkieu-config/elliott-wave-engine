@@ -93,7 +93,7 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm run test
+        run: npm run test:coverage
 
       # Gate on high/critical only: the moderate advisories are transitive dev-only
       # and their fixes are breaking-change bumps.

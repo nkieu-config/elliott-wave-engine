@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
-# ── Elliott Wave Lab — Next.js 15 frontend (Node 20) ──
+# ── Elliott Wave Lab — Next.js 15 frontend (Node 22) ──
 # Built from apps/web as context (docker-compose sets `context: ./apps/web`).
 # Multi-stage: a fat builder compiles the app, a slim runner serves it.
 
 # ---- Stage 1: build ----
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS builder
+FROM node:22-slim@sha256:53ada149d435c38b14476cb57e4a7da73c15595aba79bd6971b547ceb6d018bf AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -24,7 +24,7 @@ COPY . .
 RUN npm run build
 
 # ---- Stage 2: run ----
-FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runner
+FROM node:22-slim@sha256:53ada149d435c38b14476cb57e4a7da73c15595aba79bd6971b547ceb6d018bf AS runner
 WORKDIR /app
 # NODE_ENV=production tells Next/React to run in prod mode; the standalone
 # server reads PORT/HOSTNAME — 0.0.0.0 exposes it outside the container.
