@@ -7,6 +7,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -14,7 +15,7 @@ from pydantic import BaseModel
 
 from apps.api import pipeline_ops
 from apps.api.middleware import RELEASE_SCOPE_KEY
-from apps.api.schemas import AnalystStreamRequest
+from apps.api.schemas import AnalystMode, AnalystStreamRequest
 from apps.api.schemas_responses import (
     CitationsFrame,
     DoneFrame,
@@ -26,11 +27,14 @@ from apps.api.schemas_responses import (
 from apps.api.services import analyst_service
 from engine import Bar, Scenario
 
+if TYPE_CHECKING:
+    from analyst.schemas.output import Mode
+
 router = APIRouter(prefix="/api/v1", tags=["analyst"])
 _log = logging.getLogger(__name__)
 
 # Wire's terse mode names → the analyst module's prompt names.
-_MODE_TO_ANALYST: dict[str, str] = {
+_MODE_TO_ANALYST: dict[AnalystMode, Mode] = {
     "explanation": "explanation",
     "outlook": "scenario_outlook",
     "risk": "slot_focus",

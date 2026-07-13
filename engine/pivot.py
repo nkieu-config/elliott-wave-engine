@@ -219,7 +219,8 @@ def enforce_min_bars(
     while True:
         idx = -1
         for i in range(len(work) - 1):
-            if work[i + 1].bar_index - work[i].bar_index >= min_bars:
+            nxt_bar, cur_bar = work[i + 1].bar_index, work[i].bar_index
+            if nxt_bar is None or cur_bar is None or nxt_bar - cur_bar >= min_bars:
                 continue
             idx = i
             break

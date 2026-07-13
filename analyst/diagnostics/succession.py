@@ -18,7 +18,7 @@ _S_LINK_MIN_FRAC_5WS = 1.01
 
 
 def _leg_size(leg: WaveNode) -> float:
-    return abs(leg.span_end.price - leg.span_start.price)
+    return abs(leg.closed_end.price - leg.span_start.price)
 
 
 def _range_of(legs: list[WaveNode]) -> float:

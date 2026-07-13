@@ -11,6 +11,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from engine.anchor import find_anchor
 from engine.parser import (
@@ -92,7 +93,7 @@ def _count_waves_cached(
         # Copy so a caller mutating a Scenario/report can't poison the cache — done
         # outside the lock so concurrent hits don't serialize on the deepcopy; the
         # cached original is never handed out or mutated, so reading it unlocked is safe.
-        return copy.deepcopy(cached)
+        return copy.deepcopy(cast("AnalysisReport | None", cached))
 
     # Compute outside the lock so distinct parses don't serialize on each other.
     segments = pivots_to_segments(_active_pivots, _anchor)

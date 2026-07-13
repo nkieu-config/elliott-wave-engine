@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from analyst.schemas.targets import Target, TargetSet
+from analyst.schemas.targets import Target, TargetSet, TargetType
 from analyst.theory.citation_map import family_invalidation_pages
 from engine import PatternKind, Scenario, WaveNode
 
@@ -11,11 +11,11 @@ _RETRACE_LEVELS = (0.236, 0.382, 0.5, 0.618, 0.786, 1.0)
 
 
 def _direction_sign(leg: WaveNode) -> int:
-    return 1 if leg.span_end.price > leg.span_start.price else -1
+    return 1 if leg.closed_end.price > leg.span_start.price else -1
 
 
 def _leg_size(leg: WaveNode) -> float:
-    return abs(leg.span_end.price - leg.span_start.price)
+    return abs(leg.closed_end.price - leg.span_start.price)
 
 
 def _ladder(
@@ -25,7 +25,7 @@ def _ladder(
     sign: int,
     levels: tuple[float, ...],
     label_prefix: str,
-    target_type: str,
+    target_type: TargetType,
     theory_page: int,
     deriv_fmt: str,
 ) -> list[Target]:
@@ -65,7 +65,7 @@ def _internal_targets(source: WaveNode, label_prefix: str, theory_page: int) -> 
 def _retracement_targets(source: WaveNode, label_prefix: str, theory_page: int) -> list[Target]:
     # Retrace runs back from leg end → negate direction sign.
     return _ladder(
-        base=source.span_end.price,
+        base=source.closed_end.price,
         size=_leg_size(source),
         sign=-_direction_sign(source),
         levels=_RETRACE_LEVELS,
@@ -170,13 +170,13 @@ def _targets_5wt(sc: Scenario) -> TargetSet:
         flow += _retracement_targets(s4, "s4 → s5 retrace", 110)
     # EQUAL_PUSH → no entries (spec §9.2 advisor consult).
 
-    full = s5.span_end.price - s1.span_start.price
+    full = s5.closed_end.price - s1.span_start.price
     confirmation = (
         Target(name="s5_retrace_100", price=s5.span_start.price,
                type="retracement", theory_page=34,
                derivation="s5 retraced 100% = s5.start"),
         Target(name="full_set_retrace_61.8",
-               price=s5.span_end.price - 0.618 * full,
+               price=s5.closed_end.price - 0.618 * full,
                type="retracement", theory_page=34,
                derivation="s5.end - 0.618 × (s5.end - s1.start)"),
         Target(name="full_set_retrace_100", price=s1.span_start.price,
@@ -185,7 +185,7 @@ def _targets_5wt(sc: Scenario) -> TargetSet:
     )
 
     invalidation = Target(
-        name="s5_end_close", price=s5.span_end.price, type="invalidation",
+        name="s5_end_close", price=s5.closed_end.price, type="invalidation",
         theory_page=22, derivation="close past s5.end invalidates completion claim",
     )
     return TargetSet(
@@ -223,18 +223,18 @@ def _targets_5ws(sc: Scenario) -> TargetSet:
     flow += _retracement_targets(s3, "s3 retrace", 103)
     flow += _retracement_targets(s4, "s4 retrace", 103)
     flow += _retracement_targets(s5, "s5 retrace", 111)
-    full = s5.span_end.price - s1.span_start.price
+    full = s5.closed_end.price - s1.span_start.price
     confirmation = (
         Target(name="s5_retrace_100", price=s5.span_start.price,
                type="retracement", theory_page=43,
                derivation="s5 retraced 100% (5W_SIDEWAY)"),
         Target(name="full_set_retrace_61.8",
-               price=s5.span_end.price - 0.618 * full,
+               price=s5.closed_end.price - 0.618 * full,
                type="retracement", theory_page=43,
                derivation="full retrace 61.8% (5W_SIDEWAY CB)"),
     )
     invalidation = Target(
-        name="s5_end_close", price=s5.span_end.price, type="invalidation",
+        name="s5_end_close", price=s5.closed_end.price, type="invalidation",
         theory_page=22, derivation="close past s5.end invalidates",
     )
     return TargetSet(
@@ -260,7 +260,7 @@ def _targets_3w(sc: Scenario) -> TargetSet:
                derivation="s3 retraced 100% = s2.end"),
     )
     invalidation = Target(
-        name="s3_end_close", price=s3.span_end.price, type="invalidation",
+        name="s3_end_close", price=s3.closed_end.price, type="invalidation",
         theory_page=48, derivation="close past s3.end invalidates 3W completion",
     )
     return TargetSet(

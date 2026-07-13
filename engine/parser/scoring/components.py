@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from engine.types import Bar, ScaleMode, WaveNode
 
@@ -78,34 +78,33 @@ def _compute_components_from_legs(
     # intermediates given → verbose per-slot detail; else plain fns (hot beam path, no detail-dict alloc).
     out: dict[str, float] = {}
     config = runtime.scoring
-    verbose = intermediates is not None
 
     struct_slot_values: list[float] = []
     for name, fn, verbose_fn in _STRUCTURAL_SLOTS:
-        if verbose:
+        if intermediates is not None:
             v, inter = verbose_fn(legs, config)
+            if v is not None:
+                intermediates[name] = inter
         else:
             v = fn(legs, config)
         if v is not None:
             out[name] = v
             struct_slot_values.append(v)
-            if verbose:
-                intermediates[name] = inter
     out["structural_total"] = min(struct_slot_values) if struct_slot_values else 0.0
 
     if runtime.bars:
         bars = runtime.bars
         visual_slot_values: list[float] = []
-        for name, fn, verbose_fn in _VISUAL_SLOTS:
-            if verbose:
-                v, inter = verbose_fn(legs, bars, config)
+        for vis_name, vis_fn, vis_verbose_fn in _VISUAL_SLOTS:
+            if intermediates is not None:
+                vis_v, vis_inter = vis_verbose_fn(legs, bars, config)
+                if vis_v is not None:
+                    intermediates[vis_name] = vis_inter
             else:
-                v = fn(legs, bars, config)
-            if v is not None:
-                out[name] = v
-                visual_slot_values.append(v)
-                if verbose:
-                    intermediates[name] = inter
+                vis_v = vis_fn(legs, bars, config)
+            if vis_v is not None:
+                out[vis_name] = vis_v
+                visual_slot_values.append(vis_v)
         if visual_slot_values:
             out["visual_total"] = min(visual_slot_values)
 
@@ -160,8 +159,9 @@ def _score_components_verbose(
         _select_display_legs(h), runtime, intermediates=intermediates,
     )
     _apply_commitment(out, h, runtime)
-    out["intermediates"] = intermediates
-    return out
+    detailed = cast("dict[str, Any]", out)
+    detailed["intermediates"] = intermediates
+    return detailed
 
 
 def _select_display_nodes(root: WaveNode) -> list[WaveNode]:
@@ -185,7 +185,8 @@ def score_intermediates(
     # Open legs (span_end=None, e.g. a Link-Wave's still-forming leg merged into the
     # root) have no settled length/speed and would crash the length-based scorers, so
     # they're excluded from the detail computation.
-    legs = [lg for lg in _select_display_nodes(scenario.root) if lg.span_end is not None]
+    closed = [lg for lg in _select_display_nodes(scenario.root) if lg.span_end is not None]
+    legs = cast("list[_Leg]", closed)
     cfg = scoring or ScoringConfig()
     out: dict = dict(scenario.score_components or {})
     intermediates: dict = {}
@@ -199,12 +200,12 @@ def score_intermediates(
             intermediates[name] = inter
     if bars:
         bars_tuple = tuple(bars)
-        for name, fn in (
+        for vis_name, vis_fn in (
             ("pivot_sharpness", pivot_sharpness_verbose),
             ("leg_smoothness", leg_smoothness_verbose),
         ):
-            v, inter = fn(legs, bars_tuple, cfg)
-            if v is not None:
-                intermediates[name] = inter
+            vis_v, vis_inter = vis_fn(legs, bars_tuple, cfg)
+            if vis_v is not None:
+                intermediates[vis_name] = vis_inter
     out["intermediates"] = intermediates
     return out

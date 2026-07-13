@@ -35,7 +35,7 @@ from analyst.schemas.narration import (
     narration_json_schema,
     parse_narration_draft,
 )
-from analyst.schemas.output import AnalysisOutput
+from analyst.schemas.output import AnalysisOutput, Mode
 from analyst.schemas.qa import QaOutput
 from analyst.serialization.fallback import mode_fallback
 from analyst.serialization.scenario import serialize_scenario
@@ -144,7 +144,7 @@ class Analyst:
         self,
         scenario: Scenario,
         bars: list[Bar],
-        mode: str,
+        mode: Mode,
         *,
         all_scenarios: list[Scenario] | None = None,
         scale_mode: ScaleMode = "linear",
@@ -289,8 +289,11 @@ class Analyst:
         gate_kw = {} if min_chars is None else {"min_chars": min_chars}
 
         def _run(prompt: str) -> tuple[str, Any, CitationReport, bool, str | None]:
+            client = self.llm_client
+            if client is None:
+                raise LLMUnavailableError("no LLM client configured")
             try:
-                raw = self.llm_client.complete(
+                raw = client.complete(
                     _chat_messages(system_prompt, prompt), format=schema,
                 )
             except Exception as e:  # all providers down → let the caller fall back
@@ -313,7 +316,7 @@ class Analyst:
             return text, draft, report, fell_back, raw
         # One repair attempt; keep the original unless the repair was hard-clean
         # where the original wasn't (don't regress a passing read into a fallback).
-        repair_user = build_repair_prompt(user_prompt, raw, report, mode=repair_mode)
+        repair_user = build_repair_prompt(user_prompt, raw or "", report, mode=repair_mode)
         try:
             text2, draft2, report2, fell_back2, raw2 = _run(repair_user)
         except LLMUnavailableError:

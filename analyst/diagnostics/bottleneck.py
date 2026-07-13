@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from analyst.schemas.bottleneck import BottleneckDiagnosis
 from analyst.taxonomy import SLOT_PROSE, STRUCTURAL_SLOTS, VISUAL_SLOTS
@@ -24,7 +24,9 @@ def diagnose_bottleneck(
     bottleneck_name, bottleneck_value = sorted_slots[0]
     gap = (sorted_slots[1][1] - bottleneck_value) if len(sorted_slots) > 1 else 0.0
 
-    dim = "structural" if bottleneck_name in _STRUCTURAL else "visual"
+    dim: Literal["structural", "visual"] = (
+        "structural" if bottleneck_name in _STRUCTURAL else "visual"
+    )
     dim_total = score_components.get(f"{dim}_total", bottleneck_value)
     # quality = MIN(structural_total, visual_total). `total` = quality × commitment.
     overall_quality = score_components.get("quality", min(
@@ -36,6 +38,8 @@ def diagnose_bottleneck(
         score_components.get("intermediates", {}).get(bottleneck_name, {})
     )
     ref = slot_theory_ref(bottleneck_name, family)
+    if ref is None:
+        raise ValueError(f"no theory reference for slot {bottleneck_name!r} (family {family!r})")
     explanation = _build_explanation(bottleneck_name, intermediates)
 
     return BottleneckDiagnosis(

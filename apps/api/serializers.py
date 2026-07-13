@@ -28,6 +28,7 @@ from apps.api.schemas_responses import (
     DiagnosticOut,
     Layer1Response,
     LinkSetOut,
+    MetaOut,
     NextPatternOut,
     NotApplicableReasonOut,
     PipelineResponse,
@@ -168,7 +169,7 @@ def serialize_pipeline(
     n_open = len(scenarios) - n_complete
 
     return PipelineResponse(
-        meta=meta,
+        meta=MetaOut.model_validate(meta),
         bars=[serialize_bar(b) for b in result.bars],
         raw_pivots=[serialize_pivot(p) for p in result.raw_pivots],
         active_pivots=[serialize_pivot(p) for p in result.active_pivots],

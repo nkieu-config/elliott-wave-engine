@@ -144,10 +144,14 @@ class WaveNode:
     sets: list[LinkSet] | None = None
 
     @property
-    def direction(self) -> TrendDir:
+    def closed_end(self) -> Pivot:
         if self.span_end is None:
-            raise ValueError("Cannot infer direction from open WaveNode (span_end is None)")
-        return "up" if self.span_end.price > self.span_start.price else "down"
+            raise ValueError("WaveNode is still open (span_end is None)")
+        return self.span_end
+
+    @property
+    def direction(self) -> TrendDir:
+        return "up" if self.closed_end.price > self.span_start.price else "down"
 
     @property
     def sub_legs(self) -> list[WaveNode]:

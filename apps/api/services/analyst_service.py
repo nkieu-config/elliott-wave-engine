@@ -15,8 +15,9 @@ from apps.api import pipeline_ops
 if TYPE_CHECKING:
     from analyst import AnalysisOutput, AnalysisResult, Analyst
     from analyst.diagnostics.education import FamilyEducation
+    from analyst.schemas.output import Mode
     from analyst.schemas.qa import QaOutput
-    from engine import AnalysisReport, Bar, Scenario
+    from engine import AnalysisReport, Bar, ScaleMode, Scenario
 
 _log = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def compute_layer1(
     bars: list[Bar],
     *,
     all_scenarios: list[Scenario],
-    scale_mode: str,
+    scale_mode: ScaleMode,
 ) -> AnalysisResult:
     return _analyst().compute_layer1(
         scenario, bars, all_scenarios=all_scenarios, scale_mode=scale_mode
@@ -107,7 +108,7 @@ def compute_top_layer1(
     report: AnalysisReport | None,
     bars: list[Bar],
     *,
-    scale_mode: str,
+    scale_mode: ScaleMode,
 ) -> AnalysisResult | None:
     """Best-effort top-scenario Layer-1 (None on failure); never blocks the pipeline response."""
     if report is None or not report.scenarios:
@@ -131,10 +132,10 @@ def compute_top_layer1(
 def analyze(
     scenario: Scenario,
     bars: list[Bar],
-    mode: str,
+    mode: Mode,
     *,
     all_scenarios: list[Scenario],
-    scale_mode: str,
+    scale_mode: ScaleMode,
     force_refresh: bool,
 ) -> AnalysisOutput:
     return _analyst().analyze(
@@ -163,7 +164,7 @@ def answer_question(
     *,
     scenario: Scenario | None,
     bars: list[Bar] | None,
-    scale_mode: str,
+    scale_mode: ScaleMode,
     force_refresh: bool,
 ) -> QaOutput:
     return _analyst().answer_question(

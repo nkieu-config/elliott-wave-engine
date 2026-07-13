@@ -168,7 +168,7 @@ class OllamaClient:
         # Only catch transport/API failures — AttributeError/ZeroDivisionError must surface.
         # httpx.TransportError covers ollama's underlying read/connect timeouts, which are
         # NOT builtin TimeoutError/OSError subclasses and would otherwise skip fallover.
-        transient = tuple(
+        transient: tuple[type[Exception], ...] = tuple(
             exc
             for exc in (
                 request_err,
@@ -181,7 +181,7 @@ class OllamaClient:
                 TypeError,
                 ValueError,
             )
-            if isinstance(exc, type) and issubclass(exc, BaseException)
+            if isinstance(exc, type) and issubclass(exc, Exception)
         )
 
         chat_kwargs_base: dict[str, Any] = {

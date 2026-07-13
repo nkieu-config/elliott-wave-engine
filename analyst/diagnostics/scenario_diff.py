@@ -36,7 +36,7 @@ def _bottleneck_slot(components: dict) -> str:
         k: v for k, v in components.items()
         if k in ALL_SLOTS and isinstance(v, (int, float))
     }
-    return min(active, key=active.get) if active else ""
+    return min(active, key=lambda slot: active[slot]) if active else ""
 
 
 def _relative_probabilities(scenarios: list) -> list[float]:

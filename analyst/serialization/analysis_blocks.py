@@ -105,8 +105,8 @@ def format_scenario_diff(diffs: tuple) -> str:
         )
         lines.append("\n| Check | Gap (score points) |")
         lines.append("|---|---|")
-        ranked = sorted(d.slot_deltas.items(), key=lambda kv: -abs(kv[1]))
-        for name, val in ranked:
+        ranked_deltas = sorted(d.slot_deltas.items(), key=lambda kv: -abs(kv[1]))
+        for name, val in ranked_deltas:
             # Bare score-points (no %) — a % would read as a probability here.
             lines.append(f"| {slot_plain(name)} | {val * 100:+.0f} |")
     return "\n".join(lines) + "\n"
@@ -132,15 +132,13 @@ def format_bottleneck(bd: BottleneckDiagnosis) -> str:
 
 
 def format_confirmation(rep: ConfirmationReport) -> str:
-    if not rep.is_applicable:
-        cite = (
-            f"(p.{rep.not_applicable_reason.citation})"
-            if rep.not_applicable_reason.citation else "(no citation)"
-        )
+    reason = rep.not_applicable_reason
+    if reason is not None:
+        cite = f"(p.{reason.citation})" if reason.citation else "(no citation)"
         return (
             f"## Confirmation\n\n"
             f"**Not applicable** — "
-            f"{humanize_family_codes(rep.not_applicable_reason.text)} {cite}\n"
+            f"{humanize_family_codes(reason.text)} {cite}\n"
         )
     rows = ["| Level | Condition | Met | Triggered at bar | Page |", "|---|---|---|---|---|"]
     for lv in rep.levels:

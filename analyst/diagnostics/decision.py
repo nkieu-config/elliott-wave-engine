@@ -46,7 +46,7 @@ def _open_wave_start_price(scenario: Scenario) -> float | None:
             last_formed = leg
     if last_formed is None:
         return None
-    return float(last_formed.span_end.price)
+    return float(last_formed.closed_end.price)
 
 
 def _open_wave_direction(scenario: Scenario) -> str | None:
@@ -64,7 +64,7 @@ def _open_wave_direction(scenario: Scenario) -> str | None:
     if last_formed is None:
         return None
     last_direction_up = (
-        last_formed.span_end.price > last_formed.span_start.price
+        last_formed.closed_end.price > last_formed.span_start.price
     )
     return "down" if last_direction_up else "up"
 
@@ -168,19 +168,15 @@ def _horizon_bars(scenario: Scenario) -> int | None:
     # Median formed-leg duration — same-degree principle proxy.
     if scenario.is_complete:
         return None
-    formed = [
-        leg for leg in scenario.legs
-        if leg.span_start is not None
-        and leg.span_end is not None
-        and leg.span_start.bar_index is not None
-        and leg.span_end.bar_index is not None
-    ]
-    if len(formed) < 2:
+    durations: list[int] = []
+    for leg in scenario.legs:
+        end = leg.span_end
+        start_bar = leg.span_start.bar_index
+        if end is None or end.bar_index is None or start_bar is None:
+            continue
+        durations.append(end.bar_index - start_bar)
+    if len(durations) < 2:
         return None
-    durations = [
-        leg.span_end.bar_index - leg.span_start.bar_index
-        for leg in formed
-    ]
     return int(statistics.median(durations))
 
 

@@ -12,7 +12,7 @@ from apps.api import pipeline_ops
 from apps.api.schemas import QaRequest
 from apps.api.schemas_responses import QaCitation, QaResponse
 from apps.api.services import analyst_service
-from engine import Bar, Scenario
+from engine import Bar, ScaleMode, Scenario
 
 router = APIRouter(prefix="/api/v1", tags=["qa"])
 _log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def qa(req: QaRequest) -> QaResponse:
     def _run() -> QaResponse:
         scenario: Scenario | None = None
         bars: list[Bar] | None = None
-        scale_mode = "linear"
+        scale_mode: ScaleMode = "linear"
         if req.chart is not None:
             # Chart-aware: rebuild the scenario the user is looking at.
             fetched = pipeline_ops.fetch_bars_or_502(req.chart)

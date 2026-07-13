@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Type-check
+        run: uv run mypy engine analyst infra apps
+
       # Fails on any upward import across apps → infra → analyst → engine.
       - name: Check architecture layers
         run: uv run lint-imports

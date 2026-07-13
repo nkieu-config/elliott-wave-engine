@@ -78,10 +78,11 @@ def _outlook(layer1: AnalysisResult) -> str:
     parts: list[str] = []
     conf = layer1.confirmation
     if conf is not None:
-        if not conf.is_applicable:
+        conf_reason = conf.not_applicable_reason
+        if conf_reason is not None:
             parts.append(
                 "Confirmation is not applicable: "
-                + humanize_family_codes(conf.not_applicable_reason.text)
+                + humanize_family_codes(conf_reason.text)
             )
         else:
             parts.append(

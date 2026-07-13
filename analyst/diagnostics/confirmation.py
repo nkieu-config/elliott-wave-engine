@@ -65,20 +65,20 @@ def _eval_5w(
         )
 
     s1, s2, _s3, s4, s5 = legs[:5]
-    trend_dir: TrendDir = "up" if s1.span_end.price > s1.span_start.price else "down"
+    trend_dir: TrendDir = "up" if s1.closed_end.price > s1.span_start.price else "down"
     opposite_dir: TrendDir = "down" if trend_dir == "up" else "up"
     s5_end_bar = _resolve_end_bar(s5.span_end, bars)
 
     l1_bar = bars_break_trendline(
-        bars, s2.span_end, s4.span_end,
+        bars, s2.closed_end, s4.closed_end,
         direction=opposite_dir, mode=mode, after_bar=s5_end_bar,
     )
     l2_bar = bars_reach_price(
         bars, s5.span_start.price,
         direction=opposite_dir, after_bar=s5_end_bar,
     )
-    full_span = s5.span_end.price - s1.span_start.price
-    l3_target = s5.span_end.price - 0.618 * full_span
+    full_span = s5.closed_end.price - s1.span_start.price
+    l3_target = s5.closed_end.price - 0.618 * full_span
     l3_bar = bars_reach_price(
         bars, l3_target, direction=opposite_dir, after_bar=s5_end_bar,
     )
@@ -130,7 +130,7 @@ def _eval_3w(sc: Scenario, bars: list[Bar], mode: ScaleMode) -> ConfirmationRepo
             citation=None,
         )
     s1, s2, s3 = legs[:3]
-    trend_dir: TrendDir = "up" if s1.span_end.price > s1.span_start.price else "down"
+    trend_dir: TrendDir = "up" if s1.closed_end.price > s1.span_start.price else "down"
     opposite_dir: TrendDir = "down" if trend_dir == "up" else "up"
     s3_end_bar = _resolve_end_bar(s3.span_end, bars)
 
@@ -143,7 +143,7 @@ def _eval_3w(sc: Scenario, bars: list[Bar], mode: ScaleMode) -> ConfirmationRepo
     # C1 only when s2 is NOT Longer (p.54).
     if not s2_longer:
         c1_bar = bars_break_trendline(
-            bars, s1.span_start, s2.span_end,
+            bars, s1.span_start, s2.closed_end,
             direction=opposite_dir, mode=mode, after_bar=s3_end_bar,
         )
         levels.append(ConfirmationLevel(
