@@ -40,8 +40,8 @@ Everything you need to run, use, and test the project locally — and to put it 
 
 ```bash
 # 1) Clone the project
-git clone https://github.com/nkieu-config/elliott-wave-ai-project.git
-cd elliott-wave-ai-project
+git clone https://github.com/nkieu-config/elliott-wave-engine.git
+cd elliott-wave-engine
 
 # 2) Install Python dependencies (uv creates .venv and installs from uv.lock)
 uv sync --extra api
@@ -262,7 +262,7 @@ it lands, and cached readings return immediately.
 ## Directory tree
 
 ```text
-elliott-wave-ai-project/
+elliott-wave-engine/
 ├── README.md                     # Project overview (start here)
 ├── pyproject.toml                # Python package definition + dependencies (managed by uv)
 ├── uv.lock                       # Pinned dependency versions for reproducible installs

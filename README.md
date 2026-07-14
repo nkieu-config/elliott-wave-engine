@@ -4,7 +4,7 @@
 
 **Rule-based wave counting you can verify, explained by an LLM that cites the theory.**
 
-[![CI](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nkieu-config/elliott-wave-ai-project/actions/workflows/ci.yml)
+[![CI](https://github.com/nkieu-config/elliott-wave-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nkieu-config/elliott-wave-engine/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-brightgreen?logo=vercel&logoColor=white)](https://elliott-wave-web.vercel.app)
 [![License: view-only](https://img.shields.io/badge/license-view--only-informational.svg)](LICENSE)
 
@@ -144,8 +144,8 @@ Each of these is expanded with the reasoning and trade-offs in [docs/architectur
 **Docker (recommended)** — the whole stack in one command:
 
 ```bash
-git clone https://github.com/nkieu-config/elliott-wave-ai-project.git
-cd elliott-wave-ai-project
+git clone https://github.com/nkieu-config/elliott-wave-engine.git
+cd elliott-wave-engine
 docker compose up --build
 ```
 
